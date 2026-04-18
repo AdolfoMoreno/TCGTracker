@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand -->
+    <color name="colorPrimary">#1A1A2E</color>
+    <color name="colorPrimaryDark">#16213E</color>
+    <color name="colorPrimaryVariant">#0F3460</color>
+    <color name="colorSecondary">#E94560</color>
+    <color name="colorSecondaryVariant">#C73652</color>
+    <color name="colorOnPrimary">#FFFFFF</color>
+
+    <!-- UI -->
+    <color name="background">#12121F</color>
+    <color name="card_background">#1E1E30</color>
+    <color name="text_primary">#F0F0F0</color>
+    <color name="text_secondary">#9E9EAF</color>
+    <color name="accent_primary">#E94560</color>
+    <color name="divider">#2A2A3E</color>
+    <color name="progress_background">#2A2A3E</color>
+    <color name="owned_stroke">#E94560</color>
+    <color name="color_complete">#4CAF50</color>
+    <color name="white">#FFFFFF</color>
+
+    <!-- Pokemon Types -->
+    <color name="type_fire">#FF6B35</color>
+    <color name="type_water">#4FC3F7</color>
+    <color name="type_grass">#66BB6A</color>
+    <color name="type_lightning">#FFD54F</color>
+    <color name="type_psychic">#CE93D8</color>
+    <color name="type_fighting">#EF8A6A</color>
+    <color name="type_darkness">#7E57C2</color>
+    <color name="type_metal">#B0BEC5</color>
+    <color name="type_dragon">#5C6BC0</color>
+    <color name="type_colorless">#BDBDBD</color>
+</resources>
