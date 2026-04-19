@@ -12,6 +12,10 @@ class PokemonRepository(private val db: AppDatabase) {
 
     fun getAllSets(): LiveData<List<PokemonSet>> = db.setDao().getAllSets()
 
+    suspend fun getAllSetCount(): Int = withContext(Dispatchers.IO) {
+        db.setDao().getSetCount()
+    }
+
     suspend fun getAllSetStats(): List<SetStats> = withContext(Dispatchers.IO) {
         val sets = db.setDao().getAllSetsSuspend()
         val ownedCounts = db.collectionDao().getOwnedCountPerSet()

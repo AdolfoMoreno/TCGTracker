@@ -53,14 +53,12 @@ class HomeFragment : Fragment() {
     private fun observeViewModel() {
         viewModel.stats.observe(viewLifecycleOwner) { stats ->
             binding.tvOwnedCount.text = stats.ownedCards.toString()
-            binding.tvTotalCount.text = stats.totalCards.toString()
+            binding.tvActiveSets.text = stats.activeSetsCount.toString()
             binding.tvCompletedSets.text = stats.completedSets.toString()
-            binding.tvTotalSets.text = stats.totalSets.toString()
         }
 
         viewModel.setStats.observe(viewLifecycleOwner) { sets ->
             adapter.submitList(sets)
-            binding.tvTotalSets.text = sets.size.toString()
         }
 
         viewModel.isLoading.observe(viewLifecycleOwner) { loading ->

@@ -7,9 +7,8 @@ import kotlinx.coroutines.launch
 
 data class HomeStats(
     val ownedCards: Int = 0,
-    val totalCards: Int = 0,
     val completedSets: Int = 0,
-    val totalSets: Int = 0
+    val activeSetsCount: Int = 0
 )
 
 class HomeViewModel(private val repository: PokemonRepository) : ViewModel() {
@@ -36,7 +35,7 @@ class HomeViewModel(private val repository: PokemonRepository) : ViewModel() {
             _isLoading.value = true
             try {
                 val sets = repository.getAllSetStats()
-                _setStats.value = sets
+                _setStats.value = sets.filter { it.ownedCount > 0 }
                 refreshStats()
             } finally {
                 _isLoading.value = false
@@ -47,10 +46,9 @@ class HomeViewModel(private val repository: PokemonRepository) : ViewModel() {
     private fun refreshStats() {
         viewModelScope.launch {
             val ownedCards = repository.getOwnedCardCountSuspend()
-            val totalCards = repository.getTotalCardCount()
             val completedSets = repository.getCompletedSetCount()
-            val totalSets = (_setStats.value?.size ?: 0)
-            _stats.value = HomeStats(ownedCards, totalCards, completedSets, totalSets)
+            val activeSetsCount = _setStats.value?.size ?: 0
+            _stats.value = HomeStats(ownedCards, completedSets, activeSetsCount)
         }
     }
 
