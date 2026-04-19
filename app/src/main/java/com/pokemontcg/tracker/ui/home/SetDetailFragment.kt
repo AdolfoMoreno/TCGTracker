@@ -1,10 +1,12 @@
 package com.pokemontcg.tracker.ui.home
 
 import android.os.Bundle
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
+import android.view.*
+import androidx.core.view.MenuHost
+import androidx.core.view.MenuProvider
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
+import com.pokemontcg.tracker.R
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.navArgs
 import androidx.recyclerview.widget.GridLayoutManager
@@ -38,7 +40,7 @@ class SetDetailFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
+        setupMenu()
         setupRecyclerView()
         setupFilters()
         observeViewModel()
@@ -53,18 +55,21 @@ class SetDetailFragment : Fragment() {
             layoutManager = GridLayoutManager(requireContext(), 5)
             adapter = this@SetDetailFragment.adapter
         }
+        viewModel.cards.observe(viewLifecycleOwner) {
+            requireActivity().invalidateMenu()
+        }
     }
 
     private fun setupFilters() {
-        binding.chipAll.setOnClickListener {
-            viewModel.setFilterOwned(false)
-            binding.chipAll.isChecked = true
-            binding.chipOwned.isChecked = false
+        binding.chipAll.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                viewModel.setFilterOwned(false)
+            }
         }
-        binding.chipOwned.setOnClickListener {
-            viewModel.setFilterOwned(true)
-            binding.chipOwned.isChecked = true
-            binding.chipAll.isChecked = false
+        binding.chipOwned.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                viewModel.setFilterOwned(true)
+            }
         }
         binding.chipAll.isChecked = true
     }
@@ -86,6 +91,33 @@ class SetDetailFragment : Fragment() {
         viewModel.isLoading.observe(viewLifecycleOwner) { loading ->
             binding.progressBarLoading.visibility = if (loading) View.VISIBLE else View.GONE
         }
+    }
+
+    private fun setupMenu() {
+        val menuHost: MenuHost = requireActivity()
+        menuHost.addMenuProvider(object : MenuProvider {
+            override fun onPrepareMenu(menu: Menu) {
+                val allOwned = viewModel.cards.value?.all { it.isOwned } ?: false
+                val selectAllItem = menu.findItem(R.id.action_select_all)
+                selectAllItem?.setIcon(if (allOwned) R.drawable.ic_check_circle else R.drawable.circle_dot)
+                selectAllItem?.title = if (allOwned) "Deselect All" else "Select All"
+            }
+
+            override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
+                menuInflater.inflate(R.menu.set_detail_menu, menu)
+            }
+
+            override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
+                return when (menuItem.itemId) {
+                    R.id.action_select_all -> {
+                        val allOwned = viewModel.cards.value?.all { it.isOwned } ?: false
+                        viewModel.selectAllCards(!allOwned)
+                        true
+                    }
+                    else -> false
+                }
+            }
+        }, viewLifecycleOwner, Lifecycle.State.RESUMED)
     }
 
     override fun onDestroyView() {

@@ -66,6 +66,13 @@ class SetDetailViewModel(
     fun setFilterOwned(filter: Boolean) {
         _filterOwned.value = filter
     }
+
+    fun selectAllCards(owned: Boolean) {
+        viewModelScope.launch {
+            repository.toggleSetCollection(setId, owned)
+            loadSetData()
+        }
+    }
 }
 
 class SetDetailViewModelFactory(

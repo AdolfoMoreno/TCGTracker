@@ -42,6 +42,10 @@ class PokemonRepository(private val db: AppDatabase) {
 
     fun getOwnedCardCount(): LiveData<Int> = db.collectionDao().getOwnedCardCount()
 
+    suspend fun getOwnedCardCountSuspend(): Int = withContext(Dispatchers.IO) {
+        db.collectionDao().getOwnedCardCountSuspend()
+    }
+
     suspend fun getTotalCardCount(): Int = withContext(Dispatchers.IO) {
         db.cardDao().getTotalCardCount()
     }
@@ -76,4 +80,19 @@ class PokemonRepository(private val db: AppDatabase) {
         withContext(Dispatchers.IO) {
             db.collectionDao().getEntryForCard(cardId)
         }
+
+    suspend fun toggleSetCollection(setId: String, owned: Boolean) = withContext(Dispatchers.IO) {
+        val cards = db.cardDao().getCardsForSetSuspend(setId)
+        if (owned) {
+            cards.forEach { card ->
+                if (db.collectionDao().getEntryForCard(card.id) == null) {
+                    db.collectionDao().insertEntry(CollectionEntry(cardId = card.id))
+                }
+            }
+        } else {
+            cards.forEach { card ->
+                db.collectionDao().deleteEntryByCardId(card.id)
+            }
+        }
+    }
 }

@@ -26,16 +26,18 @@ class HomeViewModel(private val repository: PokemonRepository) : ViewModel() {
     init {
         loadData()
         // Observe owned count changes to refresh stats
-        repository.getOwnedCardCount().observeForever { refreshStats() }
+        repository.getOwnedCardCount().observeForever { 
+            refreshStats() 
+        }
     }
 
     fun loadData() {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                refreshStats()
                 val sets = repository.getAllSetStats()
                 _setStats.value = sets
+                refreshStats()
             } finally {
                 _isLoading.value = false
             }
@@ -44,7 +46,7 @@ class HomeViewModel(private val repository: PokemonRepository) : ViewModel() {
 
     private fun refreshStats() {
         viewModelScope.launch {
-            val ownedCards = repository.getOwnedCardCount().value ?: 0
+            val ownedCards = repository.getOwnedCardCountSuspend()
             val totalCards = repository.getTotalCardCount()
             val completedSets = repository.getCompletedSetCount()
             val totalSets = (_setStats.value?.size ?: 0)
