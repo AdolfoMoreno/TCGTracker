@@ -1,6 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Pokémon TCG Tracker</string>
-    <string name="nav_home">Home</string>
-    <string name="nav_browse">Browse</string>
+    <string name="nav_my_collection">My Collection</string>
+    <string name="nav_all">All</string>
+    <string name="nav_storage">Storage</string>
+    <string name="nav_wants">Wants</string>
+    <string name="nav_decks">Decks</string>
+    <string name="nav_settings">Settings</string>
+    <string name="set_detail_title">Set Detail</string>
+    <string name="section_storage_kicker">Organize your real-world collection.</string>
+    <string name="section_storage_summary">Storage will track binders, boxes, deck boxes, and shelves so you can find cards fast once location data is added.</string>
+    <string name="section_storage_next">Next implementation slice: add storage locations to collection entries, then surface per-location counts and filters here.</string>
+    <string name="section_wants_kicker">Track your chase list separately from ownership.</string>
+    <string name="section_wants_summary">Wants will let you bookmark missing cards, desired extra copies, and priority targets without mixing them into owned inventory.</string>
+    <string name="section_wants_next">Next implementation slice: create a wanted-card table, then add search, set grouping, and priority controls here.</string>
+    <string name="section_decks_kicker">Build decks against your collection.</string>
+    <string name="section_decks_summary">Decks will bring saved deck lists, required quantities, and ownership checks into the app so collecting and playing live together.</string>
+    <string name="section_decks_next">Next implementation slice: add deck and deck-card tables, then introduce deck create/edit flows and ownership summaries here.</string>
+    <string name="section_settings_kicker">Tune the app around your workflow.</string>
+    <string name="section_settings_summary">Settings will hold display preferences, filters, export/import actions, and later theme or sync options.</string>
+    <string name="section_settings_next">Next implementation slice: decide between DataStore or SharedPreferences, then wire a real settings screen here.</string>
+    <string name="section_now_live">Section Ready</string>
+    <string name="section_plan_label">What comes next</string>
 </resources>

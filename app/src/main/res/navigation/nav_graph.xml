@@ -4,12 +4,12 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/nav_graph"
-    app:startDestination="@id/nav_home">
+    app:startDestination="@id/nav_my_collection">
 
     <fragment
-        android:id="@+id/nav_home"
+        android:id="@+id/nav_my_collection"
         android:name="com.pokemontcg.tracker.ui.home.HomeFragment"
-        android:label="Home"
+        android:label="@string/nav_my_collection"
         tools:layout="@layout/fragment_home">
 
         <action
@@ -19,9 +19,9 @@
     </fragment>
 
     <fragment
-        android:id="@+id/nav_browse"
+        android:id="@+id/nav_all"
         android:name="com.pokemontcg.tracker.ui.browse.BrowseFragment"
-        android:label="Browse"
+        android:label="@string/nav_all"
         tools:layout="@layout/fragment_browse">
 
         <action
@@ -31,9 +31,33 @@
     </fragment>
 
     <fragment
+        android:id="@+id/nav_storage"
+        android:name="com.pokemontcg.tracker.ui.sections.SectionPlaceholderFragment"
+        android:label="@string/nav_storage"
+        tools:layout="@layout/fragment_section_placeholder" />
+
+    <fragment
+        android:id="@+id/nav_wants"
+        android:name="com.pokemontcg.tracker.ui.sections.SectionPlaceholderFragment"
+        android:label="@string/nav_wants"
+        tools:layout="@layout/fragment_section_placeholder" />
+
+    <fragment
+        android:id="@+id/nav_decks"
+        android:name="com.pokemontcg.tracker.ui.sections.SectionPlaceholderFragment"
+        android:label="@string/nav_decks"
+        tools:layout="@layout/fragment_section_placeholder" />
+
+    <fragment
+        android:id="@+id/nav_settings"
+        android:name="com.pokemontcg.tracker.ui.sections.SectionPlaceholderFragment"
+        android:label="@string/nav_settings"
+        tools:layout="@layout/fragment_section_placeholder" />
+
+    <fragment
         android:id="@+id/nav_set_detail"
         android:name="com.pokemontcg.tracker.ui.home.SetDetailFragment"
-        android:label="Set Detail"
+        android:label="@string/set_detail_title"
         tools:layout="@layout/fragment_set_detail">
 
         <argument
