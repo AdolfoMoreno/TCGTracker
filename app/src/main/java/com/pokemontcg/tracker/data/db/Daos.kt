@@ -99,6 +99,81 @@ interface CollectionDao {
     suspend fun getCompletedSetCount(): Int
 }
 
+@Dao
+interface WishlistDao {
+    @Query("""
+        SELECT w.id, w.name,
+               COUNT(wc.cardId) AS cardCount,
+               COALESCE(SUM(CASE WHEN col.cardId IS NOT NULL THEN 1 ELSE 0 END), 0) AS ownedCount
+        FROM wishlists w
+        LEFT JOIN wishlist_cards wc ON wc.wishlistId = w.id
+        LEFT JOIN collection col ON col.cardId = wc.cardId
+        GROUP BY w.id
+        ORDER BY w.updatedAt DESC, w.name COLLATE NOCASE ASC
+    """)
+    fun getWishlistSummaries(): LiveData<List<WishlistSummary>>
+
+    @Query("SELECT * FROM wishlists ORDER BY updatedAt DESC, name COLLATE NOCASE ASC")
+    suspend fun getAllWishlists(): List<Wishlist>
+
+    @Query("SELECT * FROM wishlists WHERE id = :wishlistId")
+    suspend fun getWishlistById(wishlistId: Long): Wishlist?
+
+    @Query("""
+        SELECT COUNT(*) FROM wishlists
+        WHERE LOWER(name) = LOWER(:name) AND id != COALESCE(:excludeId, -1)
+    """)
+    suspend fun getWishlistNameConflictCount(name: String, excludeId: Long?): Int
+
+    @Insert
+    suspend fun insertWishlist(wishlist: Wishlist): Long
+
+    @Update
+    suspend fun updateWishlist(wishlist: Wishlist)
+
+    @Delete
+    suspend fun deleteWishlist(wishlist: Wishlist)
+
+    @Query("UPDATE wishlists SET updatedAt = :updatedAt WHERE id IN (:wishlistIds)")
+    suspend fun touchWishlists(wishlistIds: List<Long>, updatedAt: Long)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertWishlistCard(crossRef: WishlistCardCrossRef): Long
+
+    @Query("DELETE FROM wishlist_cards WHERE wishlistId = :wishlistId AND cardId = :cardId")
+    suspend fun deleteWishlistCard(wishlistId: Long, cardId: String)
+
+    @Query("SELECT wishlistId FROM wishlist_cards WHERE cardId = :cardId")
+    suspend fun getWishlistIdsForCard(cardId: String): List<Long>
+
+    @Query("""
+        SELECT w.id, w.name,
+               EXISTS(
+                   SELECT 1 FROM wishlist_cards wc
+                   WHERE wc.wishlistId = w.id AND wc.cardId = :cardId
+               ) AS isSelected
+        FROM wishlists w
+        ORDER BY w.updatedAt DESC, w.name COLLATE NOCASE ASC
+    """)
+    suspend fun getWishlistMembershipStates(cardId: String): List<WishlistMembershipState>
+
+    @Query("""
+        SELECT c.id, c.name, c.number, c.setId, c.rarity, c.types, c.supertype,
+               c.imageSmall, c.imageLarge,
+               s.name AS setName, s.series AS setSeries, s.releaseDate AS releaseDate,
+               COALESCE(col.quantity, 0) AS ownedQuantity
+        FROM wishlist_cards wc
+        INNER JOIN cards c ON c.id = wc.cardId
+        INNER JOIN sets s ON s.id = c.setId
+        LEFT JOIN collection col ON col.cardId = c.id
+        WHERE wc.wishlistId = :wishlistId
+        ORDER BY s.releaseDate DESC,
+                 CASE WHEN c.number GLOB '[0-9]*' THEN CAST(c.number AS INTEGER) ELSE 999999 END,
+                 c.number ASC
+    """)
+    suspend fun getWishlistCards(wishlistId: Long): List<WishlistCardItem>
+}
+
 data class SetOwnedCount(
     val setId: String,
     val ownedCount: Int

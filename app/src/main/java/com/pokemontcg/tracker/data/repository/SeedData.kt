@@ -5,8 +5,10 @@ import com.pokemontcg.tracker.data.model.PokemonCard
 import com.pokemontcg.tracker.data.model.PokemonSet
 
 /**
- * Seeds the database with a selection of real Pokemon TCG sets and their cards.
- * In a real app, you'd populate this from a full dataset JSON asset.
+ * Developer reference data used to rebuild the bundled prebuilt database asset.
+ *
+ * The app no longer seeds Room at runtime. Fresh installs now copy the SQLite
+ * database from `src/main/assets/database/pokemon_tcg_tracker.db`.
  */
 object SeedData {
 

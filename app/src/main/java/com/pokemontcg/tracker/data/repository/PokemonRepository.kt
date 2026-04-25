@@ -5,6 +5,7 @@ import com.pokemontcg.tracker.data.db.AppDatabase
 import com.pokemontcg.tracker.data.model.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.room.withTransaction
 
 class PokemonRepository(private val db: AppDatabase) {
 
@@ -97,6 +98,109 @@ class PokemonRepository(private val db: AppDatabase) {
             cards.forEach { card ->
                 db.collectionDao().deleteEntryByCardId(card.id)
             }
+        }
+    }
+
+    // ── Wishlists ─────────────────────────────────────────────────────────────
+
+    fun getWishlistSummaries(): LiveData<List<WishlistSummary>> = db.wishlistDao().getWishlistSummaries()
+
+    suspend fun getWishlist(wishlistId: Long): Wishlist? = withContext(Dispatchers.IO) {
+        db.wishlistDao().getWishlistById(wishlistId)
+    }
+
+    suspend fun getWishlistCards(wishlistId: Long): List<WishlistCardItem> = withContext(Dispatchers.IO) {
+        db.wishlistDao().getWishlistCards(wishlistId)
+    }
+
+    suspend fun getWishlistMembershipStates(cardId: String): List<WishlistMembershipState> =
+        withContext(Dispatchers.IO) {
+            db.wishlistDao().getWishlistMembershipStates(cardId)
+        }
+
+    suspend fun createWishlist(name: String): WishlistSaveResult = withContext(Dispatchers.IO) {
+        val trimmedName = name.trim()
+        if (trimmedName.isBlank()) {
+            return@withContext WishlistSaveResult.BlankName
+        }
+        if (db.wishlistDao().getWishlistNameConflictCount(trimmedName, null) > 0) {
+            return@withContext WishlistSaveResult.DuplicateName
+        }
+
+        val now = System.currentTimeMillis()
+        val wishlistId = db.wishlistDao().insertWishlist(
+            Wishlist(name = trimmedName, createdAt = now, updatedAt = now)
+        )
+        WishlistSaveResult.Success(wishlistId)
+    }
+
+    suspend fun renameWishlist(wishlistId: Long, name: String): WishlistSaveResult =
+        withContext(Dispatchers.IO) {
+            val trimmedName = name.trim()
+            if (trimmedName.isBlank()) {
+                return@withContext WishlistSaveResult.BlankName
+            }
+            if (db.wishlistDao().getWishlistNameConflictCount(trimmedName, wishlistId) > 0) {
+                return@withContext WishlistSaveResult.DuplicateName
+            }
+
+            val existing = db.wishlistDao().getWishlistById(wishlistId)
+                ?: return@withContext WishlistSaveResult.BlankName
+
+            val now = System.currentTimeMillis()
+            db.wishlistDao().updateWishlist(existing.copy(name = trimmedName, updatedAt = now))
+            WishlistSaveResult.Success(wishlistId)
+        }
+
+    suspend fun deleteWishlist(wishlistId: Long) = withContext(Dispatchers.IO) {
+        db.wishlistDao().getWishlistById(wishlistId)?.let { db.wishlistDao().deleteWishlist(it) }
+    }
+
+    suspend fun setCardWishlistMemberships(
+        cardId: String,
+        selectedWishlistIds: Set<Long>
+    ) = withContext(Dispatchers.IO) {
+        db.withTransaction {
+            val now = System.currentTimeMillis()
+            val currentIds = db.wishlistDao().getWishlistIdsForCard(cardId).toSet()
+            val targetIds = selectedWishlistIds
+
+            val idsToAdd = targetIds - currentIds
+            val idsToRemove = currentIds - targetIds
+
+            idsToAdd.forEach { wishlistId ->
+                db.wishlistDao().insertWishlistCard(
+                    WishlistCardCrossRef(wishlistId = wishlistId, cardId = cardId, addedAt = now)
+                )
+            }
+            idsToRemove.forEach { wishlistId ->
+                db.wishlistDao().deleteWishlistCard(wishlistId, cardId)
+            }
+
+            val touchedIds = (idsToAdd + idsToRemove).toList()
+            if (touchedIds.isNotEmpty()) {
+                db.wishlistDao().touchWishlists(touchedIds, now)
+            }
+        }
+    }
+
+    suspend fun removeCardFromWishlist(wishlistId: Long, cardId: String) = withContext(Dispatchers.IO) {
+        db.withTransaction {
+            db.wishlistDao().deleteWishlistCard(wishlistId, cardId)
+            db.wishlistDao().touchWishlists(listOf(wishlistId), System.currentTimeMillis())
+        }
+    }
+
+    suspend fun markWishlistCardAsCollected(wishlistId: Long, cardId: String) = withContext(Dispatchers.IO) {
+        db.withTransaction {
+            val existing = db.collectionDao().getEntryForCard(cardId)
+            if (existing != null) {
+                db.collectionDao().updateEntry(existing.copy(quantity = existing.quantity + 1))
+            } else {
+                db.collectionDao().insertEntry(CollectionEntry(cardId = cardId, quantity = 1))
+            }
+            db.wishlistDao().deleteWishlistCard(wishlistId, cardId)
+            db.wishlistDao().touchWishlists(listOf(wishlistId), System.currentTimeMillis())
         }
     }
 }

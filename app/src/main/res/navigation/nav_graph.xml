@@ -38,9 +38,9 @@
 
     <fragment
         android:id="@+id/nav_wants"
-        android:name="com.pokemontcg.tracker.ui.sections.SectionPlaceholderFragment"
+        android:name="com.pokemontcg.tracker.ui.wants.WishlistsFragment"
         android:label="@string/nav_wants"
-        tools:layout="@layout/fragment_section_placeholder" />
+        tools:layout="@layout/fragment_wishlists" />
 
     <fragment
         android:id="@+id/nav_decks"
@@ -63,6 +63,18 @@
         <argument
             android:name="setId"
             app:argType="string"/>
+
+    </fragment>
+
+    <fragment
+        android:id="@+id/nav_wishlist_detail"
+        android:name="com.pokemontcg.tracker.ui.wants.WishlistDetailFragment"
+        android:label="@string/wishlist_detail_title"
+        tools:layout="@layout/fragment_wishlist_detail">
+
+        <argument
+            android:name="wishlistId"
+            app:argType="long" />
 
     </fragment>
 

@@ -11,7 +11,9 @@ import com.pokemontcg.tracker.data.model.CardWithCollection
 import com.pokemontcg.tracker.databinding.ItemCardGridBinding
 
 class CardGridAdapter(
-    private val onCardClick: (String) -> Unit
+    private val onCardClick: (String) -> Unit,
+    private val onCardLongClick: ((String) -> Unit)? = null,
+    private val subtitleProvider: ((CardWithCollection) -> String?)? = null
 ) : ListAdapter<CardWithCollection, CardGridAdapter.CardViewHolder>(CardDiffCallback()) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CardViewHolder {
@@ -33,6 +35,13 @@ class CardGridAdapter(
             val card = item.card
             binding.tvCardNumber.text = "#${card.number}"
             binding.tvCardName.text = card.name
+            val subtitle = subtitleProvider?.invoke(item)
+            if (subtitle.isNullOrBlank()) {
+                binding.tvCardSet.visibility = android.view.View.GONE
+            } else {
+                binding.tvCardSet.text = subtitle
+                binding.tvCardSet.visibility = android.view.View.VISIBLE
+            }
             binding.tvRarity.text = card.rarity
             binding.tvSupertype.text = card.supertype
 
@@ -59,6 +68,10 @@ class CardGridAdapter(
             }
 
             binding.root.setOnClickListener { onCardClick(card.id) }
+            binding.root.setOnLongClickListener {
+                onCardLongClick?.invoke(card.id)
+                onCardLongClick != null
+            }
         }
 
         private fun getTypeColor(types: String): Int = when {

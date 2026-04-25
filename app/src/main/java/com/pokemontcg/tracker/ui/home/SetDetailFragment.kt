@@ -2,10 +2,12 @@ package com.pokemontcg.tracker.ui.home
 
 import android.os.Bundle
 import android.view.*
+import android.widget.Toast
 import androidx.core.view.MenuHost
 import androidx.core.view.MenuProvider
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
 import com.pokemontcg.tracker.R
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.navArgs
@@ -13,6 +15,9 @@ import androidx.recyclerview.widget.GridLayoutManager
 import com.pokemontcg.tracker.PokemonApp
 import com.pokemontcg.tracker.databinding.FragmentSetDetailBinding
 import com.pokemontcg.tracker.ui.components.CardGridAdapter
+import com.pokemontcg.tracker.ui.wants.showWishlistNameDialog
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import kotlinx.coroutines.launch
 
 class SetDetailFragment : Fragment() {
 
@@ -47,9 +52,14 @@ class SetDetailFragment : Fragment() {
     }
 
     private fun setupRecyclerView() {
-        adapter = CardGridAdapter { cardId ->
-            viewModel.toggleCard(cardId)
-        }
+        adapter = CardGridAdapter(
+            onCardClick = { cardId ->
+                viewModel.toggleCard(cardId)
+            },
+            onCardLongClick = { cardId ->
+                showWishlistPicker(cardId)
+            }
+        )
         binding.rvCards.apply {
             // Landscape grid: more columns
             layoutManager = GridLayoutManager(requireContext(), 5)
@@ -123,5 +133,67 @@ class SetDetailFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
+    }
+
+    private fun showWishlistPicker(cardId: String, selectedOverride: Set<Long>? = null) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            val memberships = viewModel.getWishlistMembershipStates(cardId)
+            if (memberships.isEmpty()) {
+                showCreateWishlistForCard(cardId)
+                return@launch
+            }
+
+            val wishlistNames = memberships.map { it.name }.toTypedArray()
+            val checkedState = BooleanArray(memberships.size) { index ->
+                selectedOverride?.contains(memberships[index].id) ?: memberships[index].isSelected
+            }
+
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.wishlist_picker_title)
+                .setMultiChoiceItems(wishlistNames, checkedState) { _, which, isChecked ->
+                    checkedState[which] = isChecked
+                }
+                .setPositiveButton(R.string.action_save) { _, _ ->
+                    val selectedIds = memberships.indices
+                        .filter { checkedState[it] }
+                        .map { memberships[it].id }
+                        .toSet()
+
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        viewModel.setCardWishlistMemberships(cardId, selectedIds)
+                        Toast.makeText(
+                            requireContext(),
+                            R.string.wishlist_picker_saved,
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .setNeutralButton(R.string.action_create_wishlist) { _, _ ->
+                    val pendingIds = memberships.indices
+                        .filter { checkedState[it] }
+                        .map { memberships[it].id }
+                        .toSet()
+                    showCreateWishlistForCard(cardId, pendingIds)
+                }
+                .show()
+        }
+    }
+
+    private fun showCreateWishlistForCard(cardId: String, selectedIds: Set<Long> = emptySet()) {
+        showWishlistNameDialog(
+            titleRes = R.string.wishlist_create_title,
+            onSubmit = { name -> viewModel.createWishlist(name) },
+            onSuccess = { wishlistId ->
+                viewLifecycleOwner.lifecycleScope.launch {
+                    viewModel.setCardWishlistMemberships(cardId, selectedIds + wishlistId)
+                    Toast.makeText(
+                        requireContext(),
+                        R.string.wishlist_picker_saved,
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        )
     }
 }

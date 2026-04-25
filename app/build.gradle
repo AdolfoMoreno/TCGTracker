@@ -40,6 +40,20 @@ android {
     }
 }
 
+tasks.register("rebuildPrebuiltDb", Exec) {
+    workingDir projectDir
+    commandLine "python3", "scripts/prebuilt_db.py", "rebuild"
+}
+
+tasks.register("validatePrebuiltDb", Exec) {
+    workingDir projectDir
+    commandLine "python3", "scripts/prebuilt_db.py", "validate"
+}
+
+tasks.named("preBuild").configure {
+    dependsOn("validatePrebuiltDb")
+}
+
 dependencies {
     // AndroidX Core
     implementation 'androidx.core:core-ktx:1.12.0'

@@ -1,9 +1,9 @@
 package com.pokemontcg.tracker.data.model
 
 import androidx.room.Entity
-import androidx.room.PrimaryKey
 import androidx.room.ForeignKey
 import androidx.room.Index
+import androidx.room.PrimaryKey
 
 /**
  * Represents a Pokemon TCG Set (e.g., "Scarlet & Violet Base Set")
@@ -68,6 +68,45 @@ data class CollectionEntry(
 )
 
 /**
+ * User-created wishlist grouping multiple wanted cards.
+ */
+@Entity(tableName = "wishlists")
+data class Wishlist(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+/**
+ * Join table mapping cards to one or more wishlists.
+ */
+@Entity(
+    tableName = "wishlist_cards",
+    primaryKeys = ["wishlistId", "cardId"],
+    foreignKeys = [
+        ForeignKey(
+            entity = Wishlist::class,
+            parentColumns = ["id"],
+            childColumns = ["wishlistId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = PokemonCard::class,
+            parentColumns = ["id"],
+            childColumns = ["cardId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index("cardId")]
+)
+data class WishlistCardCrossRef(
+    val wishlistId: Long,
+    val cardId: String,
+    val addedAt: Long = System.currentTimeMillis()
+)
+
+/**
  * Combined view model for a card with its collection status
  */
 data class CardWithCollection(
@@ -89,4 +128,41 @@ data class SetStats(
     val completionPercent: Float get() =
         if (totalCount == 0) 0f else (ownedCount.toFloat() / totalCount) * 100f
     val isComplete: Boolean get() = ownedCount >= totalCount && totalCount > 0
+}
+
+data class WishlistSummary(
+    val id: Long,
+    val name: String,
+    val cardCount: Int,
+    val ownedCount: Int
+)
+
+data class WishlistMembershipState(
+    val id: Long,
+    val name: String,
+    val isSelected: Boolean
+)
+
+data class WishlistCardItem(
+    val id: String,
+    val name: String,
+    val number: String,
+    val setId: String,
+    val rarity: String,
+    val types: String,
+    val supertype: String,
+    val imageSmall: String,
+    val imageLarge: String,
+    val setName: String,
+    val setSeries: String,
+    val releaseDate: String,
+    val ownedQuantity: Int
+) {
+    val isOwned: Boolean get() = ownedQuantity > 0
+}
+
+sealed class WishlistSaveResult {
+    data class Success(val wishlistId: Long) : WishlistSaveResult()
+    data object BlankName : WishlistSaveResult()
+    data object DuplicateName : WishlistSaveResult()
 }
