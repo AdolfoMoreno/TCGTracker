@@ -52,7 +52,16 @@
 
         </LinearLayout>
 
-        <!-- Card name -->
+        <ImageView
+            android:id="@+id/ivCardArt"
+            android:layout_width="match_parent"
+            android:layout_height="128dp"
+            android:layout_marginBottom="8dp"
+            android:adjustViewBounds="true"
+            android:background="@drawable/bg_card_image_placeholder"
+            android:contentDescription="@string/card_scan_content_description"
+            android:scaleType="centerCrop" />
+
         <TextView
             android:id="@+id/tvCardName"
             android:layout_width="match_parent"

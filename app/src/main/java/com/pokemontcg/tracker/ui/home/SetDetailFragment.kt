@@ -1,6 +1,7 @@
 package com.pokemontcg.tracker.ui.home
 
 import android.os.Bundle
+import androidx.core.os.bundleOf
 import android.view.*
 import android.widget.Toast
 import androidx.core.view.MenuHost
@@ -10,12 +11,13 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import com.pokemontcg.tracker.R
 import androidx.fragment.app.viewModels
+import androidx.navigation.fragment.findNavController
 import androidx.navigation.fragment.navArgs
 import androidx.recyclerview.widget.GridLayoutManager
 import com.pokemontcg.tracker.PokemonApp
 import com.pokemontcg.tracker.databinding.FragmentSetDetailBinding
 import com.pokemontcg.tracker.ui.components.CardGridAdapter
-import com.pokemontcg.tracker.ui.wants.showWishlistNameDialog
+import com.pokemontcg.tracker.ui.wants.showWishlistPickerDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.launch
 
@@ -54,10 +56,10 @@ class SetDetailFragment : Fragment() {
     private fun setupRecyclerView() {
         adapter = CardGridAdapter(
             onCardClick = { cardId ->
-                viewModel.toggleCard(cardId)
+                openCardDetail(cardId)
             },
             onCardLongClick = { cardId ->
-                showWishlistPicker(cardId)
+                showCardActions(cardId)
             }
         )
         binding.rvCards.apply {
@@ -135,65 +137,54 @@ class SetDetailFragment : Fragment() {
         _binding = null
     }
 
-    private fun showWishlistPicker(cardId: String, selectedOverride: Set<Long>? = null) {
-        viewLifecycleOwner.lifecycleScope.launch {
-            val memberships = viewModel.getWishlistMembershipStates(cardId)
-            if (memberships.isEmpty()) {
-                showCreateWishlistForCard(cardId)
-                return@launch
-            }
-
-            val wishlistNames = memberships.map { it.name }.toTypedArray()
-            val checkedState = BooleanArray(memberships.size) { index ->
-                selectedOverride?.contains(memberships[index].id) ?: memberships[index].isSelected
-            }
-
-            MaterialAlertDialogBuilder(requireContext())
-                .setTitle(R.string.wishlist_picker_title)
-                .setMultiChoiceItems(wishlistNames, checkedState) { _, which, isChecked ->
-                    checkedState[which] = isChecked
-                }
-                .setPositiveButton(R.string.action_save) { _, _ ->
-                    val selectedIds = memberships.indices
-                        .filter { checkedState[it] }
-                        .map { memberships[it].id }
-                        .toSet()
-
-                    viewLifecycleOwner.lifecycleScope.launch {
-                        viewModel.setCardWishlistMemberships(cardId, selectedIds)
-                        Toast.makeText(
-                            requireContext(),
-                            R.string.wishlist_picker_saved,
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                }
-                .setNegativeButton(android.R.string.cancel, null)
-                .setNeutralButton(R.string.action_create_wishlist) { _, _ ->
-                    val pendingIds = memberships.indices
-                        .filter { checkedState[it] }
-                        .map { memberships[it].id }
-                        .toSet()
-                    showCreateWishlistForCard(cardId, pendingIds)
-                }
-                .show()
+    private fun showCardActions(cardId: String) {
+        val card = viewModel.cards.value?.firstOrNull { it.card.id == cardId } ?: return
+        val collectionAction = if (card.isOwned) {
+            getString(R.string.card_action_remove_from_collection)
+        } else {
+            getString(R.string.card_action_mark_got)
         }
+        val options = arrayOf(
+            getString(R.string.card_action_add_to_wishlist),
+            collectionAction,
+            getString(R.string.card_action_open_details)
+        )
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(card.card.name)
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> showWishlistPicker(cardId)
+                    1 -> {
+                        viewLifecycleOwner.lifecycleScope.launch {
+                            viewModel.toggleCollectionFromDetail(cardId)
+                            Toast.makeText(
+                                requireContext(),
+                                if (card.isOwned) R.string.card_removed_from_collection else R.string.card_marked_as_got,
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                    2 -> openCardDetail(cardId)
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
-    private fun showCreateWishlistForCard(cardId: String, selectedIds: Set<Long> = emptySet()) {
-        showWishlistNameDialog(
-            titleRes = R.string.wishlist_create_title,
-            onSubmit = { name -> viewModel.createWishlist(name) },
-            onSuccess = { wishlistId ->
-                viewLifecycleOwner.lifecycleScope.launch {
-                    viewModel.setCardWishlistMemberships(cardId, selectedIds + wishlistId)
-                    Toast.makeText(
-                        requireContext(),
-                        R.string.wishlist_picker_saved,
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
+    private fun showWishlistPicker(cardId: String) {
+        showWishlistPickerDialog(
+            cardId = cardId,
+            fetchMemberships = { id -> viewModel.getWishlistMembershipStates(id) },
+            saveMemberships = { id, selectedIds -> viewModel.setCardWishlistMemberships(id, selectedIds) },
+            createWishlist = { name -> viewModel.createWishlist(name) }
+        )
+    }
+
+    private fun openCardDetail(cardId: String) {
+        findNavController().navigate(
+            R.id.nav_card_detail,
+            bundleOf("cardId" to cardId, "wishlistId" to -1L)
         )
     }
 }

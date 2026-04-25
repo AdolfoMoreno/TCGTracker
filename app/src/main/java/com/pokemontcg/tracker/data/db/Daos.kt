@@ -36,6 +36,18 @@ interface CardDao {
     @Query("SELECT * FROM cards WHERE id = :cardId")
     suspend fun getCardById(cardId: String): PokemonCard?
 
+    @Query("""
+        SELECT c.id, c.name, c.number, c.setId, c.rarity, c.types, c.supertype,
+               c.imageSmall, c.imageLarge,
+               s.name AS setName, s.series AS setSeries, s.releaseDate AS releaseDate,
+               COALESCE(col.quantity, 0) AS ownedQuantity
+        FROM cards c
+        INNER JOIN sets s ON s.id = c.setId
+        LEFT JOIN collection col ON col.cardId = c.id
+        WHERE c.id = :cardId
+    """)
+    suspend fun getCardDetail(cardId: String): CardDetailItem?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCards(cards: List<PokemonCard>)
 

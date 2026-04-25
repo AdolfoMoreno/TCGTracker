@@ -45,6 +45,11 @@ tasks.register("rebuildPrebuiltDb", Exec) {
     commandLine "python3", "scripts/prebuilt_db.py", "rebuild"
 }
 
+tasks.register("generateCardScanAssets", Exec) {
+    workingDir projectDir
+    commandLine "swift", "scripts/generate_card_scans.swift"
+}
+
 tasks.register("validatePrebuiltDb", Exec) {
     workingDir projectDir
     commandLine "python3", "scripts/prebuilt_db.py", "validate"

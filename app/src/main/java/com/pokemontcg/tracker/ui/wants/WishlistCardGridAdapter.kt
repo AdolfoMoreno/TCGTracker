@@ -10,9 +10,11 @@ import androidx.recyclerview.widget.RecyclerView
 import com.pokemontcg.tracker.R
 import com.pokemontcg.tracker.data.model.WishlistCardItem
 import com.pokemontcg.tracker.databinding.ItemCardGridBinding
+import com.pokemontcg.tracker.ui.components.loadCardAsset
 
 class WishlistCardGridAdapter(
-    private val onCardClick: (WishlistCardItem) -> Unit
+    private val onCardClick: (WishlistCardItem) -> Unit,
+    private val onCardLongClick: ((WishlistCardItem) -> Unit)? = null
 ) : ListAdapter<WishlistCardItem, WishlistCardGridAdapter.WishlistCardViewHolder>(WishlistCardDiffCallback()) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): WishlistCardViewHolder {
@@ -39,6 +41,7 @@ class WishlistCardGridAdapter(
             binding.tvCardSet.visibility = View.VISIBLE
             binding.tvRarity.text = item.rarity
             binding.tvSupertype.text = item.supertype
+            binding.ivCardArt.loadCardAsset(item.imageSmall)
 
             val typeColor = getTypeColor(item.types)
             binding.viewTypeDot.setBackgroundColor(
@@ -61,6 +64,10 @@ class WishlistCardGridAdapter(
             }
 
             binding.root.setOnClickListener { onCardClick(item) }
+            binding.root.setOnLongClickListener {
+                onCardLongClick?.invoke(item)
+                onCardLongClick != null
+            }
         }
 
         private fun getTypeColor(types: String): Int = when {

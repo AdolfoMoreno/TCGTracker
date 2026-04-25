@@ -2,6 +2,7 @@ package com.pokemontcg.tracker.ui.home
 
 import androidx.lifecycle.*
 import com.pokemontcg.tracker.data.model.CardWithCollection
+import com.pokemontcg.tracker.data.model.CardDetailItem
 import com.pokemontcg.tracker.data.model.SetStats
 import com.pokemontcg.tracker.data.model.WishlistMembershipState
 import com.pokemontcg.tracker.data.model.WishlistSaveResult
@@ -86,6 +87,15 @@ class SetDetailViewModel(
 
     suspend fun createWishlist(name: String): WishlistSaveResult {
         return repository.createWishlist(name)
+    }
+
+    suspend fun getCardDetail(cardId: String): CardDetailItem? {
+        return repository.getCardDetail(cardId)
+    }
+
+    suspend fun toggleCollectionFromDetail(cardId: String) {
+        repository.toggleCollectionFromDetail(cardId)
+        loadSetData()
     }
 }
 

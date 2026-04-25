@@ -1,6 +1,7 @@
 package com.pokemontcg.tracker.ui.components
 
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
@@ -37,13 +38,14 @@ class CardGridAdapter(
             binding.tvCardName.text = card.name
             val subtitle = subtitleProvider?.invoke(item)
             if (subtitle.isNullOrBlank()) {
-                binding.tvCardSet.visibility = android.view.View.GONE
+                binding.tvCardSet.visibility = View.GONE
             } else {
                 binding.tvCardSet.text = subtitle
-                binding.tvCardSet.visibility = android.view.View.VISIBLE
+                binding.tvCardSet.visibility = View.VISIBLE
             }
             binding.tvRarity.text = card.rarity
             binding.tvSupertype.text = card.supertype
+            binding.ivCardArt.loadCardAsset(card.imageSmall)
 
             // Type color dot
             val typeColor = getTypeColor(card.types)
@@ -57,14 +59,14 @@ class CardGridAdapter(
                 binding.cardView.strokeWidth = 4
                 binding.cardView.strokeColor =
                     ContextCompat.getColor(binding.root.context, R.color.owned_stroke)
-                binding.ivCheckmark.visibility = android.view.View.VISIBLE
+                binding.ivCheckmark.visibility = View.VISIBLE
                 binding.tvQuantity.text = "×${item.quantity}"
-                binding.tvQuantity.visibility = android.view.View.VISIBLE
+                binding.tvQuantity.visibility = View.VISIBLE
             } else {
                 binding.root.alpha = 0.5f
                 binding.cardView.strokeWidth = 0
-                binding.ivCheckmark.visibility = android.view.View.GONE
-                binding.tvQuantity.visibility = android.view.View.GONE
+                binding.ivCheckmark.visibility = View.GONE
+                binding.tvQuantity.visibility = View.GONE
             }
 
             binding.root.setOnClickListener { onCardClick(card.id) }

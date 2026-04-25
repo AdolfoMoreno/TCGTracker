@@ -161,6 +161,24 @@ data class WishlistCardItem(
     val isOwned: Boolean get() = ownedQuantity > 0
 }
 
+data class CardDetailItem(
+    val id: String,
+    val name: String,
+    val number: String,
+    val setId: String,
+    val rarity: String,
+    val types: String,
+    val supertype: String,
+    val imageSmall: String,
+    val imageLarge: String,
+    val setName: String,
+    val setSeries: String,
+    val releaseDate: String,
+    val ownedQuantity: Int
+) {
+    val isOwned: Boolean get() = ownedQuantity > 0
+}
+
 sealed class WishlistSaveResult {
     data class Success(val wishlistId: Long) : WishlistSaveResult()
     data object BlankName : WishlistSaveResult()

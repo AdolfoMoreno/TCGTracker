@@ -46,4 +46,17 @@
     <string name="wishlist_detail_empty">This wishlist is empty. Long-press cards in set detail to add them here.</string>
     <string name="wishlist_action_mark_got">Mark as Got It</string>
     <string name="wishlist_action_remove">Remove from Wishlist</string>
+    <string name="card_detail_title">Card Detail</string>
+    <string name="card_scan_content_description">Card scan</string>
+    <string name="card_action_mark_got">Mark as Got It</string>
+    <string name="card_action_remove_from_collection">Remove from Collection</string>
+    <string name="card_action_add_to_wishlist">Add to Wishlist</string>
+    <string name="card_action_open_details">Open Details</string>
+    <string name="card_action_back_to_wishlist">Back to Wishlist</string>
+    <string name="card_marked_as_got">Card added to collection.</string>
+    <string name="card_removed_from_collection">Card removed from collection.</string>
+    <string name="card_detail_set_label">%1$s • #%2$s</string>
+    <string name="card_detail_no_type">No type</string>
+    <string name="card_detail_owned">Owned: %1$d copy/copies</string>
+    <string name="card_detail_not_owned">Not in collection</string>
 </resources>

@@ -11,6 +11,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SEED_DATA_PATH = ROOT / "src/main/java/com/pokemontcg/tracker/data/repository/SeedData.kt"
 ASSET_DB_PATH = ROOT / "src/main/assets/database/pokemon_tcg_tracker.db"
+ASSET_ROOT = ROOT / "src/main/assets"
+ROOM_IDENTITY_HASH = "3b46022222913f4a82d4edcc13ffd09e"
 
 SET_RE = re.compile(
     r'PokemonSet\("([^"]+)", "([^"]+)", "([^"]+)", (\d+), (\d+), "([^"]+)"(?:, "([^"]*)", "([^"]*)")?\)'
@@ -140,7 +142,18 @@ def parse_explicit_cards(source: str, start_marker: str, end_marker: str) -> lis
     cards = []
     for match in CARD_RE.finditer(section):
         card_id, name, number, set_id, rarity, types, supertype = match.groups()
-        cards.append((card_id, name, number, set_id, rarity, types, supertype, "", ""))
+        image_small, image_large = card_image_paths(card_id)
+        cards.append((
+            card_id,
+            name,
+            number,
+            set_id,
+            rarity,
+            types,
+            supertype,
+            image_small,
+            image_large,
+        ))
     return cards
 
 
@@ -168,17 +181,19 @@ def generate_generic_cards(set_id: str, count: int) -> list[tuple[str, str, str,
             supertype = "Energy"
             name = GENERIC_ENERGY_NAMES[num % len(GENERIC_ENERGY_NAMES)]
 
+        card_id = f"{set_id}-{num}"
+        image_small, image_large = card_image_paths(card_id)
         cards.append(
             (
-                f"{set_id}-{num}",
+                card_id,
                 name,
                 str(num),
                 set_id,
                 GENERIC_RARITIES[num % len(GENERIC_RARITIES)],
                 GENERIC_TYPES[num % len(GENERIC_TYPES)],
                 supertype,
-                "",
-                "",
+                image_small,
+                image_large,
             )
         )
     return cards
@@ -227,8 +242,24 @@ def generate_swsh1_cards(names: list[str]) -> list[tuple[str, str, str, str, str
         else:
             types = ""
 
-        cards.append((f"swsh1-{index}", name, str(index), "swsh1", rarity, types, supertype, "", ""))
+        card_id = f"swsh1-{index}"
+        image_small, image_large = card_image_paths(card_id)
+        cards.append((
+            card_id,
+            name,
+            str(index),
+            "swsh1",
+            rarity,
+            types,
+            supertype,
+            image_small,
+            image_large,
+        ))
     return cards
+
+
+def card_image_paths(card_id: str) -> tuple[str, str]:
+    return f"cards/small/{card_id}.png", f"cards/large/{card_id}.png"
 
 
 def build_dataset() -> tuple[
@@ -274,7 +305,7 @@ def rebuild_database(db_path: Path) -> tuple[int, int]:
     conn = sqlite3.connect(db_path)
     try:
         conn.execute("PRAGMA journal_mode=DELETE")
-        conn.execute("PRAGMA user_version = 2")
+        conn.execute("PRAGMA user_version = 3")
         conn.executescript(
             """
             PRAGMA foreign_keys = OFF;
@@ -329,6 +360,10 @@ def rebuild_database(db_path: Path) -> tuple[int, int]:
                 FOREIGN KEY(`cardId`) REFERENCES `cards`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
             );
             CREATE INDEX `index_wishlist_cards_cardId` ON `wishlist_cards` (`cardId`);
+            CREATE TABLE `room_master_table` (
+                `id` INTEGER PRIMARY KEY,
+                `identity_hash` TEXT
+            );
             PRAGMA foreign_keys = ON;
             """
         )
@@ -345,6 +380,10 @@ def rebuild_database(db_path: Path) -> tuple[int, int]:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             cards,
+        )
+        conn.execute(
+            "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
+            (ROOM_IDENTITY_HASH,),
         )
         conn.commit()
     finally:
@@ -393,8 +432,8 @@ def validate_database(db_path: Path) -> tuple[int, int]:
     conn = sqlite3.connect(db_path)
     try:
         user_version = fetch_one(conn, "PRAGMA user_version")
-        if user_version != 2:
-            raise AssertionError(f"Expected PRAGMA user_version=2, found {user_version}")
+        if user_version != 3:
+            raise AssertionError(f"Expected PRAGMA user_version=3, found {user_version}")
 
         actual_tables = {
             row[0]
@@ -402,9 +441,17 @@ def validate_database(db_path: Path) -> tuple[int, int]:
                 "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
             ).fetchall()
         }
-        required_tables = {"sets", "cards", "collection", "wishlists", "wishlist_cards"}
+        required_tables = {"sets", "cards", "collection", "wishlists", "wishlist_cards", "room_master_table"}
         if not required_tables.issubset(actual_tables):
             raise AssertionError(f"Missing required tables. Expected at least {required_tables}, found {actual_tables}")
+
+        room_hash = conn.execute(
+            "SELECT identity_hash FROM room_master_table WHERE id = 42"
+        ).fetchone()
+        if room_hash is None or room_hash[0] != ROOM_IDENTITY_HASH:
+            raise AssertionError(
+                f"Expected room_master_table identity hash {ROOM_IDENTITY_HASH}, found {room_hash}"
+            )
 
         assert_columns(
             conn,
@@ -496,6 +543,25 @@ def validate_database(db_path: Path) -> tuple[int, int]:
             raise AssertionError(f"Expected empty wishlists table in asset DB, found {wishlist_count} rows")
         if wishlist_card_count != 0:
             raise AssertionError(f"Expected empty wishlist_cards table in asset DB, found {wishlist_card_count} rows")
+
+        missing_small = fetch_one(conn, "SELECT COUNT(*) FROM cards WHERE imageSmall = '' OR imageSmall IS NULL")
+        missing_large = fetch_one(conn, "SELECT COUNT(*) FROM cards WHERE imageLarge = '' OR imageLarge IS NULL")
+        if missing_small or missing_large:
+            raise AssertionError(
+                f"Expected every card to have image paths, found missingSmall={missing_small}, missingLarge={missing_large}"
+            )
+
+        small_asset_root = ASSET_ROOT / "cards/small"
+        large_asset_root = ASSET_ROOT / "cards/large"
+        if small_asset_root.exists() or large_asset_root.exists():
+            missing_assets = 0
+            for small_path, large_path in conn.execute("SELECT imageSmall, imageLarge FROM cards"):
+                if not (ASSET_ROOT / small_path).exists():
+                    missing_assets += 1
+                if not (ASSET_ROOT / large_path).exists():
+                    missing_assets += 1
+            if missing_assets:
+                raise AssertionError(f"Missing {missing_assets} referenced card image asset files")
 
         orphan_cards = fetch_one(
             conn,

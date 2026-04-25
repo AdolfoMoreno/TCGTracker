@@ -43,6 +43,10 @@ class PokemonRepository(private val db: AppDatabase) {
             }
         }
 
+    suspend fun getCardDetail(cardId: String): CardDetailItem? = withContext(Dispatchers.IO) {
+        db.cardDao().getCardDetail(cardId)
+    }
+
     // ── Collection ────────────────────────────────────────────────────────────
 
     fun getOwnedCardCount(): LiveData<Int> = db.collectionDao().getOwnedCardCount()
@@ -201,6 +205,15 @@ class PokemonRepository(private val db: AppDatabase) {
             }
             db.wishlistDao().deleteWishlistCard(wishlistId, cardId)
             db.wishlistDao().touchWishlists(listOf(wishlistId), System.currentTimeMillis())
+        }
+    }
+
+    suspend fun toggleCollectionFromDetail(cardId: String) = withContext(Dispatchers.IO) {
+        val existing = db.collectionDao().getEntryForCard(cardId)
+        if (existing != null) {
+            db.collectionDao().deleteEntryByCardId(cardId)
+        } else {
+            db.collectionDao().insertEntry(CollectionEntry(cardId = cardId, quantity = 1))
         }
     }
 }

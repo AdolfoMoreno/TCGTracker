@@ -78,4 +78,21 @@
 
     </fragment>
 
+    <fragment
+        android:id="@+id/nav_card_detail"
+        android:name="com.pokemontcg.tracker.ui.card.CardDetailFragment"
+        android:label="@string/card_detail_title"
+        tools:layout="@layout/fragment_card_detail">
+
+        <argument
+            android:name="cardId"
+            app:argType="string" />
+
+        <argument
+            android:name="wishlistId"
+            app:argType="long"
+            android:defaultValue="-1L" />
+
+    </fragment>
+
 </navigation>

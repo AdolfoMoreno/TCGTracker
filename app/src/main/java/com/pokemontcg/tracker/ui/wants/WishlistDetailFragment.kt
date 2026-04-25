@@ -1,17 +1,23 @@
 package com.pokemontcg.tracker.ui.wants
 
 import android.os.Bundle
+import android.widget.Toast
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.GridLayoutManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.pokemontcg.tracker.PokemonApp
 import com.pokemontcg.tracker.R
 import com.pokemontcg.tracker.data.model.WishlistCardItem
 import com.pokemontcg.tracker.databinding.FragmentWishlistDetailBinding
+import kotlinx.coroutines.launch
+import com.pokemontcg.tracker.ui.wants.showWishlistPickerDialog
 
 class WishlistDetailFragment : Fragment() {
 
@@ -52,9 +58,14 @@ class WishlistDetailFragment : Fragment() {
     }
 
     private fun setupRecyclerView() {
-        adapter = WishlistCardGridAdapter { card ->
-            showCardActions(card)
-        }
+        adapter = WishlistCardGridAdapter(
+            onCardClick = { card ->
+                openCardDetail(card)
+            },
+            onCardLongClick = { card ->
+                showCardActions(card)
+            }
+        )
         binding.rvWishlistCards.apply {
             layoutManager = GridLayoutManager(requireContext(), 5)
             adapter = this@WishlistDetailFragment.adapter
@@ -84,21 +95,62 @@ class WishlistDetailFragment : Fragment() {
     }
 
     private fun showCardActions(card: WishlistCardItem) {
+        val collectionAction = if (card.isOwned) {
+            getString(R.string.card_action_remove_from_collection)
+        } else {
+            getString(R.string.card_action_mark_got)
+        }
         val options = arrayOf(
-            getString(R.string.wishlist_action_mark_got),
-            getString(R.string.wishlist_action_remove)
+            getString(R.string.card_action_add_to_wishlist),
+            collectionAction,
+            getString(R.string.card_action_open_details)
         )
 
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(card.name)
             .setItems(options) { _, which ->
                 when (which) {
-                    0 -> viewModel.markCardAsCollected(card.id)
-                    1 -> viewModel.removeCard(card.id)
+                    0 -> showWishlistPicker(card.id)
+                    1 -> {
+                        if (card.isOwned) {
+                            viewLifecycleOwner.lifecycleScope.launch {
+                                viewModel.toggleCollectionFromDetail(card.id)
+                                Toast.makeText(
+                                    requireContext(),
+                                    R.string.card_removed_from_collection,
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        } else {
+                            viewModel.markCardAsCollected(card.id)
+                            Toast.makeText(
+                                requireContext(),
+                                R.string.card_marked_as_got,
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                    2 -> openCardDetail(card)
                 }
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+    }
+
+    private fun showWishlistPicker(cardId: String) {
+        showWishlistPickerDialog(
+            cardId = cardId,
+            fetchMemberships = { id -> viewModel.getWishlistMembershipStates(id) },
+            saveMemberships = { id, selectedIds -> viewModel.setCardWishlistMemberships(id, selectedIds) },
+            createWishlist = { name -> viewModel.createWishlist(name) }
+        )
+    }
+
+    private fun openCardDetail(card: WishlistCardItem) {
+        findNavController().navigate(
+            R.id.nav_card_detail,
+            bundleOf("cardId" to card.id, "wishlistId" to wishlistId)
+        )
     }
 
     override fun onDestroyView() {

@@ -1,27 +1,24 @@
-package com.pokemontcg.tracker.ui.wants
+package com.pokemontcg.tracker.ui.card
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.pokemontcg.tracker.data.model.Wishlist
-import com.pokemontcg.tracker.data.model.WishlistCardItem
+import com.pokemontcg.tracker.data.model.CardDetailItem
 import com.pokemontcg.tracker.data.model.WishlistMembershipState
 import com.pokemontcg.tracker.data.model.WishlistSaveResult
 import com.pokemontcg.tracker.data.repository.PokemonRepository
 import kotlinx.coroutines.launch
 
-class WishlistDetailViewModel(
+class CardDetailViewModel(
     private val repository: PokemonRepository,
-    private val wishlistId: Long
+    private val cardId: String,
+    private val sourceWishlistId: Long?
 ) : ViewModel() {
 
-    private val _wishlist = MutableLiveData<Wishlist?>()
-    val wishlist: LiveData<Wishlist?> = _wishlist
-
-    private val _cards = MutableLiveData<List<WishlistCardItem>>(emptyList())
-    val cards: LiveData<List<WishlistCardItem>> = _cards
+    private val _card = MutableLiveData<CardDetailItem?>()
+    val card: LiveData<CardDetailItem?> = _card
 
     private val _isLoading = MutableLiveData(true)
     val isLoading: LiveData<Boolean> = _isLoading
@@ -34,33 +31,30 @@ class WishlistDetailViewModel(
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                _wishlist.value = repository.getWishlist(wishlistId)
-                _cards.value = repository.getWishlistCards(wishlistId)
+                _card.value = repository.getCardDetail(cardId)
             } finally {
                 _isLoading.value = false
             }
         }
     }
 
-    fun markCardAsCollected(cardId: String) {
+    fun performCollectionAction() {
         viewModelScope.launch {
-            repository.markWishlistCardAsCollected(wishlistId, cardId)
+            val current = _card.value ?: return@launch
+            if (!current.isOwned && sourceWishlistId != null) {
+                repository.markWishlistCardAsCollected(sourceWishlistId, cardId)
+            } else {
+                repository.toggleCollectionFromDetail(cardId)
+            }
             refresh()
         }
     }
 
-    fun removeCard(cardId: String) {
-        viewModelScope.launch {
-            repository.removeCardFromWishlist(wishlistId, cardId)
-            refresh()
-        }
-    }
-
-    suspend fun getWishlistMembershipStates(cardId: String): List<WishlistMembershipState> {
+    suspend fun getWishlistMembershipStates(): List<WishlistMembershipState> {
         return repository.getWishlistMembershipStates(cardId)
     }
 
-    suspend fun setCardWishlistMemberships(cardId: String, selectedWishlistIds: Set<Long>) {
+    suspend fun setCardWishlistMemberships(selectedWishlistIds: Set<Long>) {
         repository.setCardWishlistMemberships(cardId, selectedWishlistIds)
         refresh()
     }
@@ -68,19 +62,15 @@ class WishlistDetailViewModel(
     suspend fun createWishlist(name: String): WishlistSaveResult {
         return repository.createWishlist(name)
     }
-
-    suspend fun toggleCollectionFromDetail(cardId: String) {
-        repository.toggleCollectionFromDetail(cardId)
-        refresh()
-    }
 }
 
-class WishlistDetailViewModelFactory(
+class CardDetailViewModelFactory(
     private val repository: PokemonRepository,
-    private val wishlistId: Long
+    private val cardId: String,
+    private val sourceWishlistId: Long?
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         @Suppress("UNCHECKED_CAST")
-        return WishlistDetailViewModel(repository, wishlistId) as T
+        return CardDetailViewModel(repository, cardId, sourceWishlistId) as T
     }
 }
