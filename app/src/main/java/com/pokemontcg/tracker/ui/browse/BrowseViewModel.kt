@@ -7,6 +7,26 @@ import kotlinx.coroutines.launch
 
 class BrowseViewModel(private val repository: PokemonRepository) : ViewModel() {
 
+    private val seriesDisplayOrder = listOf(
+        "Mega Evolution",
+        "Scarlet & Violet",
+        "Sword & Shield",
+        "Sun & Moon",
+        "XY",
+        "Black & White",
+        "HeartGold & SoulSilver",
+        "Platinum",
+        "Diamond & Pearl",
+        "EX",
+        "POP",
+        "NP",
+        "E-Card",
+        "Neo",
+        "Gym",
+        "Base",
+        "Other",
+    )
+
     val allSets: LiveData<List<PokemonSet>> = repository.getAllSets()
 
     private val _searchQuery = MutableLiveData("")
@@ -29,21 +49,23 @@ class BrowseViewModel(private val repository: PokemonRepository) : ViewModel() {
     // Group by series
     val setsBySeries: LiveData<Map<String, List<PokemonSet>>> = filteredSets.map { sets ->
         sets.groupBy { it.series }
-            .toSortedMap(compareByDescending { seriesSortOrder(it) })
+            .toList()
+            .sortedWith(
+                compareBy<Pair<String, List<PokemonSet>>> { seriesSortOrder(it.first) }
+                    .thenBy { it.first.lowercase() }
+            )
+            .associateTo(linkedMapOf()) { (series, groupedSets) ->
+                series to groupedSets
+            }
     }
 
     fun setSearchQuery(query: String) {
         _searchQuery.value = query
     }
 
-    private fun seriesSortOrder(series: String): Int = when {
-        series.contains("Scarlet & Violet") -> 6
-        series.contains("Sword & Shield") -> 5
-        series.contains("Sun & Moon") -> 4
-        series.contains("XY") -> 3
-        series.contains("Black & White") -> 2
-        series.contains("Diamond") || series.contains("HeartGold") -> 1
-        else -> 0
+    private fun seriesSortOrder(series: String): Int {
+        val index = seriesDisplayOrder.indexOf(series)
+        return if (index >= 0) index else Int.MAX_VALUE
     }
 }
 

@@ -2,3 +2,5 @@
 /.gradle/
 /app/build/
 /app/build/intermediates/javac/debug/classes/
+/app/card_images_source/
+/app/src/main/assets/cards.scans/

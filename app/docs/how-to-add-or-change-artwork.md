@@ -1,115 +1,130 @@
 # How To Add Or Change Artwork
 
-This app currently expects card artwork to be stored as local asset files and referenced from the database.
+This app now builds its card catalog from the local source artwork under `app/card_images_source/`.
 
-## Where To Put The Files
+## Current Source Of Truth
 
-Create these folders if they do not exist yet:
+The database rebuild script reads:
 
-- `app/src/main/assets/cards/small/`
-- `app/src/main/assets/cards/large/`
+- set metadata from each set folder's `manifest.json`
+- card ids from each manifest card entry
+- local artwork files from that same set folder
 
-Use:
-
-- `small` for grid/list thumbnails
-- `large` for the card detail page
-
-## Required Filename Format
-
-The current database path convention is:
-
-- `cards/small/<cardId>.png`
-- `cards/large/<cardId>.png`
-
-Examples:
-
-- `app/src/main/assets/cards/small/sv1-1.png`
-- `app/src/main/assets/cards/large/sv1-1.png`
-- `app/src/main/assets/cards/small/base1-4.png`
-- `app/src/main/assets/cards/large/base1-4.png`
-
-The filename must match the card `id` in the `cards` table exactly.
-
-## Important Note About File Types
-
-Right now the app and DB are set up for `.png` paths.
-
-That means:
-
-- `PNG` will work immediately
-- `JPG` or `JPEG` will not be picked up automatically unless we also update the stored DB paths
-
-If your source files are JPEGs, the easiest path is to convert them to PNG and keep the filename format above.
-
-## Minimum Artwork Set
-
-For each card, add:
-
-- one small PNG thumbnail in `cards/small`
-- one large PNG scan in `cards/large`
-
-If a file is missing, the app will show a placeholder instead of crashing.
-
-## How To Replace Existing Artwork
-
-To change a card image:
-
-1. Find the card id.
-2. Replace the matching file in `small` and/or `large`.
-3. Keep the same filename.
-
-Example:
-
-- replace `app/src/main/assets/cards/small/swsh1-25.png`
-- replace `app/src/main/assets/cards/large/swsh1-25.png`
-
-No DB change is needed if the filename stays the same.
-
-## How To Add Artwork For New Cards
-
-If the DB already contains the card and follows the current path convention:
-
-1. Add the two PNG files using the card id as the filename.
-2. Rebuild or run the app.
-
-If the card id does not exist in the DB yet, the artwork alone is not enough. The card record must also exist in the database.
-
-## How To Check The Card Id
-
-Card ids come from the `cards` table in:
+The database file is:
 
 - `app/src/main/assets/database/pokemon_tcg_tracker.db`
 
-Examples of ids used by the app:
-
-- `sv1-1`
-- `base1-4`
-- `swsh1-25`
-
-If you want, I can also add a small helper script later to export a full list of expected filenames from the database.
-
-## Validation Behavior
-
-The DB validation script is:
+The rebuild script is:
 
 - `app/scripts/prebuilt_db.py`
 
-Current behavior:
+The packaged in-app image files are generated into:
 
-- if no artwork folders exist yet, validation still passes
-- once `app/src/main/assets/cards/small` or `app/src/main/assets/cards/large` exists, validation expects the referenced files to exist
+- `app/src/main/assets/cards/scans/`
 
-So once you start dropping artwork into those folders, it is best to add them in a complete, consistent way.
+Important:
+
+- `card_images_source/` is the raw source library
+- `cards/scans/` is the compact generated app-ready artwork
+- only `database/` and `cards/` are packaged into the app
+
+## Folder Layout
+
+Artwork should live under:
+
+- `app/card_images_source/<Era>/<Set>/`
+
+Examples:
+
+- `app/card_images_source/Black & White/Black and White/`
+- `app/card_images_source/Scarlet & Violet/151/`
+- `app/card_images_source/Base/Base/`
+
+Each set folder should contain:
+
+- a `manifest.json`
+- local image files for as many cards as you currently have
+
+## File Naming
+
+The importer matches cards by the card id inside square brackets in the filename.
+
+Example:
+
+- `85 - Tranquill [bw1-85].png`
+- `4 - Charizard [base1-4].png`
+- `3 - Venusaur ex [sv3pt5-3].png`
+
+The important part is the bracketed id:
+
+- `[bw1-85]`
+- `[base1-4]`
+- `[sv3pt5-3]`
+
+The rest of the filename can be human-friendly.
+
+## Image Sizes
+
+Right now the app uses one compact generated file for both:
+
+- `imageSmall`
+- `imageLarge`
+
+So one raw source image file per card is enough for now.
+
+If a card is listed in the manifest but its local image file is missing:
+
+- the card still stays in the database
+- the image path is left blank
+- the app shows the placeholder artwork for that card
+
+## Supported File Types
+
+These local image formats are supported by the importer:
+
+- `.png`
+- `.jpg`
+- `.jpeg`
+- `.webp`
+
+## How To Replace Existing Artwork
+
+1. Go to the card's set folder in `app/card_images_source/`.
+2. Replace the file for that card.
+3. Keep the same bracketed card id in the filename.
+
+If the bracketed id stays the same, the importer will keep matching it correctly.
+
+## How To Add New Artwork
+
+If the card already exists in the set `manifest.json`:
+
+1. Add the image file to that set folder.
+2. Include the card id in brackets in the filename.
+3. Rebuild the database.
+
+If the card is not in the manifest yet, the artwork file alone is not enough. The card must also exist in the set's `manifest.json`.
+
+## Validation Behavior
+
+`app/scripts/prebuilt_db.py validate` checks that:
+
+- every manifest-backed set is in the DB
+- every manifest-backed card is in the DB
+- every non-empty referenced image file exists on disk
+
+So if a manifest card exists but its local file is missing, validation still passes and that card will render with the placeholder until artwork is added later.
 
 ## Recommended Workflow
 
-1. Prepare PNG files named by card id.
-2. Put thumbnails in `app/src/main/assets/cards/small/`.
-3. Put large scans in `app/src/main/assets/cards/large/`.
-4. Run validation when you are ready.
+1. Add or replace files inside the correct `card_images_source/<Era>/<Set>/` folder.
+2. Keep the bracketed card id in the filename.
+3. Run the compact asset generator.
+4. Run the DB rebuild.
+5. Run validation.
 
-If you want, the next step can be one of these:
+If you want later, I can also add:
 
-1. I add a script that prints every expected artwork filename from the DB.
-2. I add support for `.jpg` / `.jpeg` files too.
-3. I add a bulk import script that renames your artwork files automatically.
+1. a helper that reports missing local artwork by set
+2. a helper that renames files automatically from card ids
+3. a metadata import path for rarity, types, and supertype once you have that source
