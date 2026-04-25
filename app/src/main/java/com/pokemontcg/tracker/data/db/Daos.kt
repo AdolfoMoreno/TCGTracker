@@ -40,7 +40,8 @@ interface CardDao {
         SELECT c.id, c.name, c.number, c.setId, c.rarity, c.types, c.supertype,
                c.imageSmall, c.imageLarge,
                s.name AS setName, s.series AS setSeries, s.releaseDate AS releaseDate,
-               COALESCE(col.quantity, 0) AS ownedQuantity
+               COALESCE(col.quantity, 0) AS ownedQuantity,
+               COALESCE((SELECT SUM(sa.quantity) FROM stored_card_assignments sa WHERE sa.cardId = c.id), 0) AS totalStoredQuantity
         FROM cards c
         INNER JOIN sets s ON s.id = c.setId
         LEFT JOIN collection col ON col.cardId = c.id
@@ -78,10 +79,10 @@ interface CollectionDao {
     @Query("DELETE FROM collection WHERE cardId = :cardId")
     suspend fun deleteEntryByCardId(cardId: String)
 
-    @Query("SELECT COUNT(*) FROM collection")
+    @Query("SELECT COALESCE(SUM(quantity), 0) FROM collection")
     fun getOwnedCardCount(): LiveData<Int>
 
-    @Query("SELECT COUNT(*) FROM collection")
+    @Query("SELECT COALESCE(SUM(quantity), 0) FROM collection")
     suspend fun getOwnedCardCountSuspend(): Int
 
     // Get count of owned cards per set
@@ -184,6 +185,96 @@ interface WishlistDao {
                  c.number ASC
     """)
     suspend fun getWishlistCards(wishlistId: Long): List<WishlistCardItem>
+}
+
+@Dao
+interface StorageDao {
+    @Query("""
+        SELECT sc.id, sc.name, sc.type, sc.capacity,
+               COALESCE(SUM(sa.quantity), 0) AS usedCapacity,
+               COUNT(sa.cardId) AS storedCardCount
+        FROM storage_containers sc
+        LEFT JOIN stored_card_assignments sa ON sa.containerId = sc.id
+        GROUP BY sc.id
+        ORDER BY sc.updatedAt DESC, sc.name COLLATE NOCASE ASC
+    """)
+    fun getStorageContainerSummaries(): LiveData<List<StorageContainerSummary>>
+
+    @Query("""
+        SELECT sc.id, sc.name, sc.type, sc.capacity,
+               COALESCE(SUM(sa.quantity), 0) AS usedCapacity,
+               COUNT(sa.cardId) AS storedCardCount
+        FROM storage_containers sc
+        LEFT JOIN stored_card_assignments sa ON sa.containerId = sc.id
+        GROUP BY sc.id
+        ORDER BY sc.updatedAt DESC, sc.name COLLATE NOCASE ASC
+    """)
+    suspend fun getStorageContainerSummariesSuspend(): List<StorageContainerSummary>
+
+    @Query("SELECT * FROM storage_containers WHERE id = :containerId")
+    suspend fun getStorageContainerById(containerId: Long): StorageContainer?
+
+    @Query("""
+        SELECT COUNT(*) FROM storage_containers
+        WHERE LOWER(name) = LOWER(:name) AND id != COALESCE(:excludeId, -1)
+    """)
+    suspend fun getStorageNameConflictCount(name: String, excludeId: Long?): Int
+
+    @Insert
+    suspend fun insertStorageContainer(container: StorageContainer): Long
+
+    @Update
+    suspend fun updateStorageContainer(container: StorageContainer)
+
+    @Delete
+    suspend fun deleteStorageContainer(container: StorageContainer)
+
+    @Query("UPDATE storage_containers SET updatedAt = :updatedAt WHERE id = :containerId")
+    suspend fun touchStorageContainer(containerId: Long, updatedAt: Long)
+
+    @Query("""
+        SELECT c.id, c.name, c.number, c.setId, c.rarity, c.types, c.supertype,
+               c.imageSmall, c.imageLarge,
+               s.name AS setName, s.series AS setSeries, s.releaseDate AS releaseDate,
+               COALESCE(col.quantity, 0) AS ownedQuantity,
+               sa.quantity AS storedQuantity
+        FROM stored_card_assignments sa
+        INNER JOIN cards c ON c.id = sa.cardId
+        INNER JOIN sets s ON s.id = c.setId
+        LEFT JOIN collection col ON col.cardId = c.id
+        WHERE sa.containerId = :containerId
+        ORDER BY s.releaseDate DESC,
+                 CASE WHEN c.number GLOB '[0-9]*' THEN CAST(c.number AS INTEGER) ELSE 999999 END,
+                 c.number ASC
+    """)
+    suspend fun getStorageCards(containerId: Long): List<StorageCardItem>
+
+    @Query("""
+        SELECT sc.id, sc.name, sc.type, sc.capacity,
+               COALESCE((SELECT SUM(quantity) FROM stored_card_assignments WHERE containerId = sc.id), 0) AS usedCapacity,
+               COALESCE((SELECT quantity FROM stored_card_assignments WHERE containerId = sc.id AND cardId = :cardId), 0) AS storedHereQuantity
+        FROM storage_containers sc
+        ORDER BY sc.updatedAt DESC, sc.name COLLATE NOCASE ASC
+    """)
+    suspend fun getStorageContainerOptions(cardId: String): List<StorageContainerOption>
+
+    @Query("SELECT COALESCE(SUM(quantity), 0) FROM stored_card_assignments WHERE cardId = :cardId")
+    suspend fun getTotalStoredQuantityForCard(cardId: String): Int
+
+    @Query("SELECT COALESCE(SUM(quantity), 0) FROM stored_card_assignments WHERE containerId = :containerId")
+    suspend fun getUsedCapacity(containerId: Long): Int
+
+    @Query("SELECT * FROM stored_card_assignments WHERE containerId = :containerId AND cardId = :cardId")
+    suspend fun getStoredCardAssignment(containerId: Long, cardId: String): StoredCardAssignment?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertStoredCardAssignment(assignment: StoredCardAssignment)
+
+    @Update
+    suspend fun updateStoredCardAssignment(assignment: StoredCardAssignment)
+
+    @Delete
+    suspend fun deleteStoredCardAssignment(assignment: StoredCardAssignment)
 }
 
 data class SetOwnedCount(

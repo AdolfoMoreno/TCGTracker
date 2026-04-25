@@ -12,7 +12,6 @@ ROOT = Path(__file__).resolve().parents[1]
 SEED_DATA_PATH = ROOT / "src/main/java/com/pokemontcg/tracker/data/repository/SeedData.kt"
 ASSET_DB_PATH = ROOT / "src/main/assets/database/pokemon_tcg_tracker.db"
 ASSET_ROOT = ROOT / "src/main/assets"
-ROOM_IDENTITY_HASH = "3b46022222913f4a82d4edcc13ffd09e"
 
 SET_RE = re.compile(
     r'PokemonSet\("([^"]+)", "([^"]+)", "([^"]+)", (\d+), (\d+), "([^"]+)"(?:, "([^"]*)", "([^"]*)")?\)'
@@ -305,7 +304,6 @@ def rebuild_database(db_path: Path) -> tuple[int, int]:
     conn = sqlite3.connect(db_path)
     try:
         conn.execute("PRAGMA journal_mode=DELETE")
-        conn.execute("PRAGMA user_version = 3")
         conn.executescript(
             """
             PRAGMA foreign_keys = OFF;
@@ -360,13 +358,28 @@ def rebuild_database(db_path: Path) -> tuple[int, int]:
                 FOREIGN KEY(`cardId`) REFERENCES `cards`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
             );
             CREATE INDEX `index_wishlist_cards_cardId` ON `wishlist_cards` (`cardId`);
-            CREATE TABLE `room_master_table` (
-                `id` INTEGER PRIMARY KEY,
-                `identity_hash` TEXT
+            CREATE TABLE `storage_containers` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `name` TEXT NOT NULL,
+                `type` TEXT NOT NULL,
+                `capacity` INTEGER NOT NULL,
+                `createdAt` INTEGER NOT NULL,
+                `updatedAt` INTEGER NOT NULL
             );
+            CREATE TABLE `stored_card_assignments` (
+                `containerId` INTEGER NOT NULL,
+                `cardId` TEXT NOT NULL,
+                `quantity` INTEGER NOT NULL,
+                `updatedAt` INTEGER NOT NULL,
+                PRIMARY KEY(`containerId`, `cardId`),
+                FOREIGN KEY(`containerId`) REFERENCES `storage_containers`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                FOREIGN KEY(`cardId`) REFERENCES `cards`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+            );
+            CREATE INDEX `index_stored_card_assignments_cardId` ON `stored_card_assignments` (`cardId`);
             PRAGMA foreign_keys = ON;
             """
         )
+        conn.execute("PRAGMA user_version = 4")
         conn.executemany(
             """
             INSERT INTO sets (id, name, series, printedTotal, total, releaseDate, logoUrl, symbolUrl)
@@ -380,10 +393,6 @@ def rebuild_database(db_path: Path) -> tuple[int, int]:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             cards,
-        )
-        conn.execute(
-            "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
-            (ROOM_IDENTITY_HASH,),
         )
         conn.commit()
     finally:
@@ -432,8 +441,8 @@ def validate_database(db_path: Path) -> tuple[int, int]:
     conn = sqlite3.connect(db_path)
     try:
         user_version = fetch_one(conn, "PRAGMA user_version")
-        if user_version != 3:
-            raise AssertionError(f"Expected PRAGMA user_version=3, found {user_version}")
+        if user_version != 4:
+            raise AssertionError(f"Expected PRAGMA user_version=4, found {user_version}")
 
         actual_tables = {
             row[0]
@@ -441,17 +450,17 @@ def validate_database(db_path: Path) -> tuple[int, int]:
                 "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
             ).fetchall()
         }
-        required_tables = {"sets", "cards", "collection", "wishlists", "wishlist_cards", "room_master_table"}
+        required_tables = {
+            "sets",
+            "cards",
+            "collection",
+            "wishlists",
+            "wishlist_cards",
+            "storage_containers",
+            "stored_card_assignments",
+        }
         if not required_tables.issubset(actual_tables):
             raise AssertionError(f"Missing required tables. Expected at least {required_tables}, found {actual_tables}")
-
-        room_hash = conn.execute(
-            "SELECT identity_hash FROM room_master_table WHERE id = 42"
-        ).fetchone()
-        if room_hash is None or room_hash[0] != ROOM_IDENTITY_HASH:
-            raise AssertionError(
-                f"Expected room_master_table identity hash {ROOM_IDENTITY_HASH}, found {room_hash}"
-            )
 
         assert_columns(
             conn,
@@ -513,6 +522,28 @@ def validate_database(db_path: Path) -> tuple[int, int]:
                 ("addedAt", "INTEGER", 1, 0),
             ],
         )
+        assert_columns(
+            conn,
+            "storage_containers",
+            [
+                ("id", "INTEGER", 1, 1),
+                ("name", "TEXT", 1, 0),
+                ("type", "TEXT", 1, 0),
+                ("capacity", "INTEGER", 1, 0),
+                ("createdAt", "INTEGER", 1, 0),
+                ("updatedAt", "INTEGER", 1, 0),
+            ],
+        )
+        assert_columns(
+            conn,
+            "stored_card_assignments",
+            [
+                ("containerId", "INTEGER", 1, 1),
+                ("cardId", "TEXT", 1, 2),
+                ("quantity", "INTEGER", 1, 0),
+                ("updatedAt", "INTEGER", 1, 0),
+            ],
+        )
 
         assert_foreign_keys(conn, "cards", [("sets", "setId", "id", "NO ACTION", "CASCADE")])
         assert_foreign_keys(conn, "collection", [("cards", "cardId", "id", "NO ACTION", "CASCADE")])
@@ -524,15 +555,26 @@ def validate_database(db_path: Path) -> tuple[int, int]:
                 ("wishlists", "wishlistId", "id", "NO ACTION", "CASCADE"),
             ],
         )
+        assert_foreign_keys(
+            conn,
+            "stored_card_assignments",
+            [
+                ("cards", "cardId", "id", "NO ACTION", "CASCADE"),
+                ("storage_containers", "containerId", "id", "NO ACTION", "CASCADE"),
+            ],
+        )
         assert_indices(conn, "cards", {"index_cards_setId": ["setId"]})
         assert_indices(conn, "collection", {"index_collection_cardId": ["cardId"]})
         assert_indices(conn, "wishlist_cards", {"index_wishlist_cards_cardId": ["cardId"]})
+        assert_indices(conn, "stored_card_assignments", {"index_stored_card_assignments_cardId": ["cardId"]})
 
         set_count = fetch_one(conn, "SELECT COUNT(*) FROM sets")
         card_count = fetch_one(conn, "SELECT COUNT(*) FROM cards")
         collection_count = fetch_one(conn, "SELECT COUNT(*) FROM collection")
         wishlist_count = fetch_one(conn, "SELECT COUNT(*) FROM wishlists")
         wishlist_card_count = fetch_one(conn, "SELECT COUNT(*) FROM wishlist_cards")
+        storage_container_count = fetch_one(conn, "SELECT COUNT(*) FROM storage_containers")
+        stored_assignment_count = fetch_one(conn, "SELECT COUNT(*) FROM stored_card_assignments")
         if set_count != len(expected_sets):
             raise AssertionError(f"Expected {len(expected_sets)} sets, found {set_count}")
         if card_count != len(expected_cards):
@@ -543,6 +585,14 @@ def validate_database(db_path: Path) -> tuple[int, int]:
             raise AssertionError(f"Expected empty wishlists table in asset DB, found {wishlist_count} rows")
         if wishlist_card_count != 0:
             raise AssertionError(f"Expected empty wishlist_cards table in asset DB, found {wishlist_card_count} rows")
+        if storage_container_count != 0:
+            raise AssertionError(
+                f"Expected empty storage_containers table in asset DB, found {storage_container_count} rows"
+            )
+        if stored_assignment_count != 0:
+            raise AssertionError(
+                f"Expected empty stored_card_assignments table in asset DB, found {stored_assignment_count} rows"
+            )
 
         missing_small = fetch_one(conn, "SELECT COUNT(*) FROM cards WHERE imageSmall = '' OR imageSmall IS NULL")
         missing_large = fetch_one(conn, "SELECT COUNT(*) FROM cards WHERE imageLarge = '' OR imageLarge IS NULL")

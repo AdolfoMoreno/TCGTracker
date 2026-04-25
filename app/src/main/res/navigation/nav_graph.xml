@@ -32,9 +32,9 @@
 
     <fragment
         android:id="@+id/nav_storage"
-        android:name="com.pokemontcg.tracker.ui.sections.SectionPlaceholderFragment"
+        android:name="com.pokemontcg.tracker.ui.storage.StorageContainersFragment"
         android:label="@string/nav_storage"
-        tools:layout="@layout/fragment_section_placeholder" />
+        tools:layout="@layout/fragment_storage_containers" />
 
     <fragment
         android:id="@+id/nav_wants"
@@ -74,6 +74,18 @@
 
         <argument
             android:name="wishlistId"
+            app:argType="long" />
+
+    </fragment>
+
+    <fragment
+        android:id="@+id/nav_storage_container_detail"
+        android:name="com.pokemontcg.tracker.ui.storage.StorageContainerDetailFragment"
+        android:label="@string/storage_detail_title"
+        tools:layout="@layout/fragment_storage_container_detail">
+
+        <argument
+            android:name="containerId"
             app:argType="long" />
 
     </fragment>

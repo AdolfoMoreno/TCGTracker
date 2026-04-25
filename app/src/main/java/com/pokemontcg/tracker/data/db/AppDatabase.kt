@@ -9,6 +9,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.pokemontcg.tracker.data.model.CollectionEntry
 import com.pokemontcg.tracker.data.model.PokemonCard
 import com.pokemontcg.tracker.data.model.PokemonSet
+import com.pokemontcg.tracker.data.model.StorageContainer
+import com.pokemontcg.tracker.data.model.StoredCardAssignment
 import com.pokemontcg.tracker.data.model.Wishlist
 import com.pokemontcg.tracker.data.model.WishlistCardCrossRef
 
@@ -18,9 +20,11 @@ import com.pokemontcg.tracker.data.model.WishlistCardCrossRef
         PokemonCard::class,
         CollectionEntry::class,
         Wishlist::class,
-        WishlistCardCrossRef::class
+        WishlistCardCrossRef::class,
+        StorageContainer::class,
+        StoredCardAssignment::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -29,6 +33,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun cardDao(): CardDao
     abstract fun collectionDao(): CollectionDao
     abstract fun wishlistDao(): WishlistDao
+    abstract fun storageDao(): StorageDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -73,6 +78,39 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `storage_containers` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `type` TEXT NOT NULL,
+                        `capacity` INTEGER NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `stored_card_assignments` (
+                        `containerId` INTEGER NOT NULL,
+                        `cardId` TEXT NOT NULL,
+                        `quantity` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`containerId`, `cardId`),
+                        FOREIGN KEY(`containerId`) REFERENCES `storage_containers`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(`cardId`) REFERENCES `cards`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_stored_card_assignments_cardId` ON `stored_card_assignments` (`cardId`)"
+                )
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -87,7 +125,7 @@ abstract class AppDatabase : RoomDatabase() {
                     // app-local Room database. Future schema changes should use explicit
                     // migrations to preserve collection data.
                     .createFromAsset("database/pokemon_tcg_tracker.db")
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                 INSTANCE = instance
                 instance

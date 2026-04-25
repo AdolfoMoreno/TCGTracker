@@ -16,7 +16,9 @@ import androidx.navigation.fragment.navArgs
 import androidx.recyclerview.widget.GridLayoutManager
 import com.pokemontcg.tracker.PokemonApp
 import com.pokemontcg.tracker.databinding.FragmentSetDetailBinding
+import com.pokemontcg.tracker.data.model.CollectionQuantityResult
 import com.pokemontcg.tracker.ui.components.CardGridAdapter
+import com.pokemontcg.tracker.ui.storage.showStoragePickerDialog
 import com.pokemontcg.tracker.ui.wants.showWishlistPickerDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.launch
@@ -139,33 +141,35 @@ class SetDetailFragment : Fragment() {
 
     private fun showCardActions(cardId: String) {
         val card = viewModel.cards.value?.firstOrNull { it.card.id == cardId } ?: return
-        val collectionAction = if (card.isOwned) {
-            getString(R.string.card_action_remove_from_collection)
-        } else {
-            getString(R.string.card_action_mark_got)
+        val options = buildList {
+            add(getString(R.string.card_action_add_to_wishlist))
+            if (card.isOwned) {
+                add(getString(R.string.card_action_add_to_storage))
+            }
+            add(getString(R.string.card_action_add_copy))
+            if (card.isOwned) {
+                add(getString(R.string.card_action_remove_copy))
+            }
+            add(getString(R.string.card_action_open_details))
         }
-        val options = arrayOf(
-            getString(R.string.card_action_add_to_wishlist),
-            collectionAction,
-            getString(R.string.card_action_open_details)
-        )
 
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(card.card.name)
-            .setItems(options) { _, which ->
-                when (which) {
-                    0 -> showWishlistPicker(cardId)
-                    1 -> {
+            .setItems(options.toTypedArray()) { _, which ->
+                when (options[which]) {
+                    getString(R.string.card_action_add_to_wishlist) -> showWishlistPicker(cardId)
+                    getString(R.string.card_action_add_to_storage) -> showStoragePicker(cardId, card.card.name)
+                    getString(R.string.card_action_add_copy) -> {
                         viewLifecycleOwner.lifecycleScope.launch {
-                            viewModel.toggleCollectionFromDetail(cardId)
-                            Toast.makeText(
-                                requireContext(),
-                                if (card.isOwned) R.string.card_removed_from_collection else R.string.card_marked_as_got,
-                                Toast.LENGTH_SHORT
-                            ).show()
+                            showCollectionResult(viewModel.addCopy(cardId))
                         }
                     }
-                    2 -> openCardDetail(cardId)
+                    getString(R.string.card_action_remove_copy) -> {
+                        viewLifecycleOwner.lifecycleScope.launch {
+                            showCollectionResult(viewModel.removeCopy(cardId))
+                        }
+                    }
+                    getString(R.string.card_action_open_details) -> openCardDetail(cardId)
                 }
             }
             .setNegativeButton(android.R.string.cancel, null)
@@ -181,10 +185,31 @@ class SetDetailFragment : Fragment() {
         )
     }
 
+    private fun showStoragePicker(cardId: String, cardName: String) {
+        showStoragePickerDialog(
+            cardName = cardName,
+            fetchOptions = { viewModel.getStorageContainerOptions(cardId) },
+            fetchSummary = { viewModel.getCardStorageSummary(cardId) },
+            assignToContainer = { containerId, quantity ->
+                viewModel.assignCardToStorage(containerId, cardId, quantity)
+            }
+        )
+    }
+
     private fun openCardDetail(cardId: String) {
         findNavController().navigate(
             R.id.nav_card_detail,
             bundleOf("cardId" to cardId, "wishlistId" to -1L)
         )
+    }
+
+    private fun showCollectionResult(result: CollectionQuantityResult) {
+        val messageRes = when (result) {
+            CollectionQuantityResult.Added -> R.string.card_copy_added
+            CollectionQuantityResult.Removed -> R.string.card_copy_removed
+            CollectionQuantityResult.NoOwnedCopy -> R.string.card_detail_not_owned
+            CollectionQuantityResult.BlockedByStorage -> R.string.storage_error_remove_copy_blocked
+        }
+        Toast.makeText(requireContext(), messageRes, Toast.LENGTH_SHORT).show()
     }
 }

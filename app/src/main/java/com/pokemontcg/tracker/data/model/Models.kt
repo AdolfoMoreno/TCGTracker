@@ -67,6 +67,53 @@ data class CollectionEntry(
     val dateAdded: Long = System.currentTimeMillis()
 )
 
+object StorageContainerType {
+    const val BINDER = "binder"
+    const val BOX = "box"
+}
+
+/**
+ * Named storage container for owned copies.
+ */
+@Entity(tableName = "storage_containers")
+data class StorageContainer(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val type: String,
+    val capacity: Int,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+/**
+ * Per-copy assignment of a card into a storage container.
+ */
+@Entity(
+    tableName = "stored_card_assignments",
+    primaryKeys = ["containerId", "cardId"],
+    foreignKeys = [
+        ForeignKey(
+            entity = StorageContainer::class,
+            parentColumns = ["id"],
+            childColumns = ["containerId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = PokemonCard::class,
+            parentColumns = ["id"],
+            childColumns = ["cardId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index("cardId")]
+)
+data class StoredCardAssignment(
+    val containerId: Long,
+    val cardId: String,
+    val quantity: Int,
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
 /**
  * User-created wishlist grouping multiple wanted cards.
  */
@@ -174,13 +221,86 @@ data class CardDetailItem(
     val setName: String,
     val setSeries: String,
     val releaseDate: String,
-    val ownedQuantity: Int
+    val ownedQuantity: Int,
+    val totalStoredQuantity: Int
 ) {
     val isOwned: Boolean get() = ownedQuantity > 0
+    val availableToAssign: Int get() = (ownedQuantity - totalStoredQuantity).coerceAtLeast(0)
+}
+
+data class StorageContainerSummary(
+    val id: Long,
+    val name: String,
+    val type: String,
+    val capacity: Int,
+    val usedCapacity: Int,
+    val storedCardCount: Int
+) {
+    val remainingCapacity: Int get() = (capacity - usedCapacity).coerceAtLeast(0)
+}
+
+data class StorageCardItem(
+    val id: String,
+    val name: String,
+    val number: String,
+    val setId: String,
+    val rarity: String,
+    val types: String,
+    val supertype: String,
+    val imageSmall: String,
+    val imageLarge: String,
+    val setName: String,
+    val setSeries: String,
+    val releaseDate: String,
+    val ownedQuantity: Int,
+    val storedQuantity: Int
+) {
+    val isOwned: Boolean get() = ownedQuantity > 0
+}
+
+data class StorageContainerOption(
+    val id: Long,
+    val name: String,
+    val type: String,
+    val capacity: Int,
+    val usedCapacity: Int,
+    val storedHereQuantity: Int
+) {
+    val remainingCapacity: Int get() = (capacity - usedCapacity).coerceAtLeast(0)
+}
+
+data class CardStorageSummary(
+    val ownedQuantity: Int,
+    val totalStoredQuantity: Int
+) {
+    val availableToAssign: Int get() = (ownedQuantity - totalStoredQuantity).coerceAtLeast(0)
 }
 
 sealed class WishlistSaveResult {
     data class Success(val wishlistId: Long) : WishlistSaveResult()
     data object BlankName : WishlistSaveResult()
     data object DuplicateName : WishlistSaveResult()
+}
+
+sealed class StorageContainerSaveResult {
+    data class Success(val containerId: Long) : StorageContainerSaveResult()
+    data object BlankName : StorageContainerSaveResult()
+    data object DuplicateName : StorageContainerSaveResult()
+    data object InvalidCapacity : StorageContainerSaveResult()
+}
+
+sealed class StorageAssignmentResult {
+    data object Success : StorageAssignmentResult()
+    data object InvalidQuantity : StorageAssignmentResult()
+    data object NotOwned : StorageAssignmentResult()
+    data object NoAvailableCopies : StorageAssignmentResult()
+    data object ContainerFull : StorageAssignmentResult()
+    data object AssignmentMissing : StorageAssignmentResult()
+}
+
+sealed class CollectionQuantityResult {
+    data object Added : CollectionQuantityResult()
+    data object Removed : CollectionQuantityResult()
+    data object NoOwnedCopy : CollectionQuantityResult()
+    data object BlockedByStorage : CollectionQuantityResult()
 }

@@ -4,14 +4,19 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.pokemontcg.tracker.PokemonApp
 import com.pokemontcg.tracker.R
+import com.pokemontcg.tracker.data.model.CollectionQuantityResult
 import com.pokemontcg.tracker.databinding.FragmentCardDetailBinding
 import com.pokemontcg.tracker.ui.components.loadCardAsset
+import com.pokemontcg.tracker.ui.storage.showStoragePickerDialog
 import com.pokemontcg.tracker.ui.wants.showWishlistPickerDialog
+import kotlinx.coroutines.launch
 
 class CardDetailFragment : Fragment() {
 
@@ -55,8 +60,31 @@ class CardDetailFragment : Fragment() {
     }
 
     private fun setupActions() {
-        binding.btnCollectionAction.setOnClickListener {
-            viewModel.performCollectionAction()
+        binding.btnIncreaseCopy.setOnClickListener {
+            viewLifecycleOwner.lifecycleScope.launch {
+                showCollectionResult(viewModel.addCopy())
+            }
+        }
+        binding.btnDecreaseCopy.setOnClickListener {
+            viewLifecycleOwner.lifecycleScope.launch {
+                showCollectionResult(viewModel.removeCopy())
+            }
+        }
+        binding.btnStorageAction.setOnClickListener {
+            val card = viewModel.card.value ?: return@setOnClickListener
+            showStoragePickerDialog(
+                cardName = card.name,
+                fetchOptions = { viewModel.getStorageContainerOptions() },
+                fetchSummary = {
+                    com.pokemontcg.tracker.data.model.CardStorageSummary(
+                        ownedQuantity = card.ownedQuantity,
+                        totalStoredQuantity = card.totalStoredQuantity
+                    )
+                },
+                assignToContainer = { containerId, quantity ->
+                    viewModel.assignCardToStorage(containerId, quantity)
+                }
+            )
         }
         binding.btnWishlistAction.setOnClickListener {
             showWishlistPickerDialog(
@@ -88,11 +116,14 @@ class CardDetailFragment : Fragment() {
             } else {
                 getString(R.string.card_detail_not_owned)
             }
-            binding.btnCollectionAction.text = if (card.isOwned) {
-                getString(R.string.card_action_remove_from_collection)
-            } else {
-                getString(R.string.card_action_mark_got)
-            }
+            binding.tvOwnedQuantityValue.text = card.ownedQuantity.toString()
+            binding.tvStorageStatus.text = getString(
+                R.string.card_detail_storage_status,
+                card.totalStoredQuantity,
+                card.availableToAssign
+            )
+            binding.btnDecreaseCopy.isEnabled = card.isOwned
+            binding.btnStorageAction.visibility = if (card.isOwned) View.VISIBLE else View.GONE
             binding.btnBackToWishlist.visibility = if (sourceWishlistId != null) View.VISIBLE else View.GONE
         }
 
@@ -104,6 +135,16 @@ class CardDetailFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
+    }
+
+    private fun showCollectionResult(result: CollectionQuantityResult) {
+        val messageRes = when (result) {
+            CollectionQuantityResult.Added -> R.string.card_copy_added
+            CollectionQuantityResult.Removed -> R.string.card_copy_removed
+            CollectionQuantityResult.NoOwnedCopy -> R.string.card_detail_not_owned
+            CollectionQuantityResult.BlockedByStorage -> R.string.storage_error_remove_copy_blocked
+        }
+        Toast.makeText(requireContext(), messageRes, Toast.LENGTH_SHORT).show()
     }
 
     companion object {

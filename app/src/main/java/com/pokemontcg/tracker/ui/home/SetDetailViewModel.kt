@@ -2,7 +2,10 @@ package com.pokemontcg.tracker.ui.home
 
 import androidx.lifecycle.*
 import com.pokemontcg.tracker.data.model.CardWithCollection
-import com.pokemontcg.tracker.data.model.CardDetailItem
+import com.pokemontcg.tracker.data.model.CardStorageSummary
+import com.pokemontcg.tracker.data.model.CollectionQuantityResult
+import com.pokemontcg.tracker.data.model.StorageAssignmentResult
+import com.pokemontcg.tracker.data.model.StorageContainerOption
 import com.pokemontcg.tracker.data.model.SetStats
 import com.pokemontcg.tracker.data.model.WishlistMembershipState
 import com.pokemontcg.tracker.data.model.WishlistSaveResult
@@ -89,13 +92,34 @@ class SetDetailViewModel(
         return repository.createWishlist(name)
     }
 
-    suspend fun getCardDetail(cardId: String): CardDetailItem? {
-        return repository.getCardDetail(cardId)
+    suspend fun getStorageContainerOptions(cardId: String): List<StorageContainerOption> {
+        return repository.getStorageContainerOptions(cardId)
     }
 
-    suspend fun toggleCollectionFromDetail(cardId: String) {
-        repository.toggleCollectionFromDetail(cardId)
+    suspend fun getCardStorageSummary(cardId: String): CardStorageSummary {
+        return repository.getCardStorageSummary(cardId)
+    }
+
+    suspend fun assignCardToStorage(
+        containerId: Long,
+        cardId: String,
+        quantity: Int
+    ): StorageAssignmentResult {
+        val result = repository.assignCardToStorage(containerId, cardId, quantity)
         loadSetData()
+        return result
+    }
+
+    suspend fun addCopy(cardId: String): CollectionQuantityResult {
+        val result = repository.addCollectionCopy(cardId)
+        loadSetData()
+        return result
+    }
+
+    suspend fun removeCopy(cardId: String): CollectionQuantityResult {
+        val result = repository.removeCollectionCopy(cardId)
+        loadSetData()
+        return result
     }
 }
 
